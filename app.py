@@ -1,48 +1,73 @@
 import streamlit as st
 import pandas as pd
 
-# Sayfa yapılandırması
-st.set_page_config(page_title="Üretim Paneli", layout="wide")
+st.set_page_config(page_title="Alt Dolap Üretim", layout="wide")
+st.title("📐 Basit Alt Dolap Üretim Hesaplama (Lamello Cabineo)")
 
-st.title("🛠️ Üretim Takip Paneli")
+st.markdown("Lamello Cabineo bağlantı sistemine göre parçaları ve bağlantı noktalarını listeler.")
 
-# Örnek sipariş verileri
-if "orders" not in st.session_state:
-    st.session_state.orders = pd.DataFrame([
-        {"ID": 1, "Ürün": "Mutfak Dolabı", "Durum": "Beklemede"},
-        {"ID": 2, "Ürün": "TV Ünitesi", "Durum": "Üretimde"},
-    ])
+# Giriş: Ölçüler
+with st.form("ölçü_form"):
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        genislik = st.number_input("Dolap Genişliği (mm)", min_value=300, value=600, step=10)
+    with col2:
+        yukseklik = st.number_input("Dolap Yüksekliği (mm)", min_value=300, value=720, step=10)
+    with col3:
+        derinlik = st.number_input("Dolap Derinliği (mm)", min_value=300, value=560, step=10)
 
-statuses = ["Beklemede", "Üretimde", "Tamamlandı", "Teslim Edildi"]
+    plaka_kalinligi = 18  # sabit
+    submit = st.form_submit_button("Hesapla")
 
-# Sipariş Ekleme
-with st.expander("➕ Yeni Sipariş Ekle"):
-    with st.form("siparis_form"):
-        urun = st.text_input("Ürün Adı")
-        durum = st.selectbox("Durum", statuses)
-        submitted = st.form_submit_button("Ekle")
-        if submitted and urun:
-            new_id = st.session_state.orders["ID"].max() + 1 if not st.session_state.orders.empty else 1
-            new_row = {"ID": new_id, "Ürün": urun, "Durum": durum}
-            st.session_state.orders.loc[len(st.session_state.orders)] = new_row
-            st.success("Sipariş eklendi!")
+if submit:
+    st.subheader("📦 Parça Listesi")
 
-# Duruma göre siparişleri göster
-tabs = st.tabs(statuses)
-for i, durum in enumerate(statuses):
-    with tabs[i]:
-        df = st.session_state.orders[st.session_state.orders["Durum"] == durum]
-        st.subheader(f"{durum} Siparişler")
-        st.dataframe(df, use_container_width=True)
+    # Parça Hesapları
+    parcalar = [
+        {
+            "Parça": "Yan Panel (2 adet)",
+            "En": derinlik,
+            "Boy": yukseklik,
+            "Adet": 2
+        },
+        {
+            "Parça": "Alt Panel",
+            "En": derinlik,
+            "Boy": genislik - (2 * plaka_kalinligi),
+            "Adet": 1
+        },
+        {
+            "Parça": "Üst Panel",
+            "En": derinlik,
+            "Boy": genislik - (2 * plaka_kalinligi),
+            "Adet": 1
+        },
+        {
+            "Parça": "Arka Panel (opsiyonel)",
+            "En": genislik,
+            "Boy": yukseklik,
+            "Adet": 1
+        },
+        {
+            "Parça": "Kapak (çift)",
+            "En": genislik / 2,
+            "Boy": yukseklik,
+            "Adet": 2
+        }
+    ]
 
-# Durum Güncelleme
-st.subheader("🔄 Sipariş Durumu Güncelle")
-selected_id = st.number_input("Sipariş ID", min_value=1, step=1)
-new_status = st.selectbox("Yeni Durum", statuses, key="update")
-if st.button("Güncelle"):
-    idx = st.session_state.orders[st.session_state.orders["ID"] == selected_id].index
-    if not idx.empty:
-        st.session_state.orders.at[idx[0], "Durum"] = new_status
-        st.success("Durum güncellendi.")
-    else:
-        st.error("Bu ID'ye sahip sipariş bulunamadı.")
+    df = pd.DataFrame(parcalar)
+    st.dataframe(df, use_container_width=True)
+
+    st.subheader("🔩 Lamello Cabineo Delik Yerleri (Yan Paneller İçin)")
+    # Örnek delik yerleri - üst ve alt paneli bağlamak için
+    delik_ust = 37  # üstten 37mm aşağı
+    delik_alt = yukseklik - 37  # alttan 37mm yukarı
+
+    st.markdown(f"""
+    - Üst Panel Bağlantısı: **{delik_ust} mm**
+    - Alt Panel Bağlantısı: **{delik_alt} mm**
+    - Derinlik merkezde: **{plaka_kalinligi / 2} mm** delik açılır (CNC)
+    """)
+
+    st.success("Delik merkezleri CNC'ye göre ayarlandı. DXF entegrasyonu istersen, bir sonraki adımda ekleriz.")
