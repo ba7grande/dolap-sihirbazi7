@@ -1,15 +1,18 @@
 import streamlit as st
+import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 from datetime import datetime
 
-# Proje Verisi - Örnek olarak veri eklenmiştir
+# Örnek proje verisi
 projects = [
     {"ID": 1, "Proje Adı": "Dolap 1", "Durum": "Devam Ediyor", "Başlangıç Tarihi": "2025-04-01", "Bitiş Tarihi": "2025-04-10", "Panel Sayısı": 12, "Kapak Sayısı": 4, "Toplam Maliyet": 5000, "İlerleme": 60},
     {"ID": 2, "Proje Adı": "Dolap 2", "Durum": "Tamamlandı", "Başlangıç Tarihi": "2025-03-01", "Bitiş Tarihi": "2025-03-15", "Panel Sayısı": 8, "Kapak Sayısı": 2, "Toplam Maliyet": 3000, "İlerleme": 100},
     {"ID": 3, "Proje Adı": "Dolap 3", "Durum": "Devam Ediyor", "Başlangıç Tarihi": "2025-04-05", "Bitiş Tarihi": "2025-04-12", "Panel Sayısı": 15, "Kapak Sayısı": 5, "Toplam Maliyet": 7000, "İlerleme": 80},
 ]
 
-# Kullanıcı Rol Yönetimi
+# Kullanıcı Rolü Yönetimi
 def user_role_management():
     st.sidebar.title("Kullanıcı ve Rol Yönetimi")
     role = st.sidebar.selectbox("Kullanıcı Rolü", ["Yönetici", "Proje Yöneticisi", "Kullanıcı"])
@@ -23,89 +26,99 @@ def user_role_management():
         st.sidebar.subheader("Kullanıcı Paneli")
         st.sidebar.text("Kullanıcı olarak yalnızca mevcut projeleri görüntüleyebilirsiniz.")
 
-# Proje Güncelleme
-def update_project(project_id, projects):
-    project = next((item for item in projects if item["ID"] == project_id), None)
-    if project:
-        st.subheader(f"Proje {project_id} Güncelle")
-        new_name = st.text_input("Proje Adı", value=project["Proje Adı"])
-        new_status = st.selectbox("Proje Durumu", ["Devam Ediyor", "Tamamlandı", "Beklemede"], index=["Devam Ediyor", "Tamamlandı", "Beklemede"].index(project["Durum"]))
-        new_start_date = st.date_input("Başlangıç Tarihi", value=datetime.strptime(project["Başlangıç Tarihi"], "%Y-%m-%d"))
-        new_end_date = st.date_input("Bitiş Tarihi", value=datetime.strptime(project["Bitiş Tarihi"], "%Y-%m-%d"))
-        
-        if st.button(f"Proje {project_id} Güncelle"):
-            project["Proje Adı"] = new_name
-            project["Durum"] = new_status
-            project["Başlangıç Tarihi"] = new_start_date.strftime("%Y-%m-%d")
-            project["Bitiş Tarihi"] = new_end_date.strftime("%Y-%m-%d")
-            st.success(f"Proje {project_id} başarıyla güncellendi.")
-        return project
-    else:
-        st.error(f"Proje ID {project_id} bulunamadı.")
-        return None
+# Basit 3D Dolap Görselleştirici
+def display_cabinet(project):
+    st.subheader(f"{project['Proje Adı']} 3D Görselleştirme")
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
 
-# Proje İlerleme Güncelleme
-def update_progress(project_id, projects):
-    project = next((item for item in projects if item["ID"] == project_id), None)
-    if project:
-        new_progress = st.slider("İlerleme (%)", min_value=0, max_value=100, value=project["İlerleme"], step=1)
-        if st.button(f"Proje {project_id} İlerleme Güncelle"):
-            project["İlerleme"] = new_progress
-            st.success(f"Proje {project_id} ilerlemesi başarıyla güncellendi.")
-        return project
-    else:
-        st.error(f"Proje ID {project_id} bulunamadı.")
-        return None
+    # Dolap Boyutları
+    width = 100  # Genişlik
+    height = 200  # Yükseklik
+    depth = 50  # Derinlik
 
-# Tüm Projeleri Görüntüleme
-def view_all_projects(projects):
-    st.subheader("Tüm Projeleri Görüntüle")
-    df = pd.DataFrame(projects)
-    st.write(df)
+    # Raf Sayısı ve Yükseklik
+    shelf_count = project["Panel Sayısı"] // 2
+    shelf_height = height / (shelf_count + 1)
 
-# Proje Arşivleme
-def archive_project(project_id, projects):
-    project = next((item for item in projects if item["ID"] == project_id), None)
-    if project:
-        project["Durum"] = "Arşivlendi"
-        st.success(f"Proje {project_id} başarıyla arşivlendi.")
-    else:
-        st.error(f"Proje ID {project_id} bulunamadı.")
+    # Dolap Zemin (Taban)
+    ax.bar3d(0, 0, 0, width, depth, height, color='lightgrey', alpha=0.6)
 
-# 3D Görselleştirme ve Üretim Adımları
-def manufacturing_steps():
-    st.subheader("Üretim Adımları ve 3D Görselleştirme")
-    st.write("Burada üretim adımları görselleştirilecektir.")
-    st.write("Örnek olarak: Panel montajı, aksesuar yerleştirme ve montaj sonrası testler gibi.")
-    st.write("3D görselleştirmeler burada yer tutucu olarak eklenmiştir.")
+    # Rafları ekleyelim
+    for i in range(shelf_count):
+        shelf_z = (i + 1) * shelf_height  # Raf yüksekliği
+        ax.bar3d(0, 0, shelf_z, width, depth, 5, color='brown', alpha=0.8)
+
+    # Kapakları ekleyelim (sol ve sağ)
+    ax.bar3d(0, 0, 0, 5, depth, height, color='blue', alpha=0.9)  # Sol kapak
+    ax.bar3d(width-5, 0, 0, 5, depth, height, color='blue', alpha=0.9)  # Sağ kapak
+
+    # Eksen etiketleri
+    ax.set_xlabel('Width (Genişlik)')
+    ax.set_ylabel('Depth (Derinlik)')
+    ax.set_zlabel('Height (Yükseklik)')
+    ax.set_title('Basit 3D Dolap Görselleştirmesi')
+
+    # Görselleştirmeyi göster
+    st.pyplot(fig)
+
+# Lamello Deliği ve Delik Pozisyonları
+def lamello_hole_positions():
+    st.subheader("Lamello Delik Pozisyonları ve 3D Gösterimi")
+    # Bu bölümde Lamello deliklerinin hesaplanması ve 3D gösterilmesi yapılabilir.
+    # Basit bir örnek:
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter([10, 20, 30], [10, 20, 30], [10, 20, 30], c='r', marker='o')  # Delik noktaları
+    ax.set_xlabel('X Axis')
+    ax.set_ylabel('Y Axis')
+    ax.set_zlabel('Z Axis')
+    ax.set_title('Lamello Delik Pozisyonları')
+
+    st.pyplot(fig)
+
+# DXF ve Delik Pozisyonlarının Eşleşmesi
+def dxf_matching():
+    st.subheader("DXF Dosyası ve Delik Pozisyonlarının Eşleşmesi")
+    st.write("DXF dosyasındaki delik pozisyonlarıyla, Lamello sistemindeki delik pozisyonlarının nasıl eşleştiği burada gösterilecek.")
+    st.write("Bu işlem için DXF dosyasının okunması, pozisyonların tespiti ve karşılaştırılması gerekmektedir.")
+
+# PDF Teklif Şablonu Tasarımı
+def pdf_quote_template():
+    st.subheader("PDF Teklif Şablonu")
+    st.write("Teklif şablonunu oluşturmak için gerekli parametreleri girin:")
+    project_name = st.text_input("Proje Adı")
+    client_name = st.text_input("Müşteri Adı")
+    total_cost = st.number_input("Toplam Maliyet", min_value=0)
     
-# Ana Ekran ve Menü
+    if st.button("Teklif Oluştur"):
+        st.write(f"Teklif Başlığı: {project_name}")
+        st.write(f"Müşteri: {client_name}")
+        st.write(f"Toplam Maliyet: {total_cost} TL")
+        st.write("Teklif başarıyla oluşturuldu.")
+        # Burada PDF şablonunun oluşturulması için ek bir kütüphane (örneğin, FPDF) kullanılabilir.
+
+# Ana Kullanıcı Arayüzü
 def main_ui(projects):
-    st.title("📋 Dolap Üretim Programı")
-    
-    # Kullanıcı ve Rol Yönetimi
+    st.title("Dolap Üretim Programı")
+
+    # Kullanıcı yönetimi
     user_role_management()
 
-    # Projeleri Görüntüleme
-    if st.button("Tüm Projeleri Görüntüle"):
-        view_all_projects(projects)
+    # Proje Seçimi
+    selected_project_id = st.selectbox("Proje Seçin", [project["Proje Adı"] for project in projects])
+    selected_project = next(project for project in projects if project["Proje Adı"] == selected_project_id)
 
-    # Proje Güncelleme ve Arşivleme
-    project_id_to_update = st.number_input("Güncellemek veya Arşivlemek için Proje ID girin", min_value=1)
-    if project_id_to_update:
-        updated_project = update_project(project_id_to_update, projects)
-        updated_project = update_progress(project_id_to_update, projects)
-    
-        if st.button(f"Proje {project_id_to_update} Arşivle"):
-            archive_project(project_id_to_update, projects)
-    
-        # Güncellenmiş projeyi görüntüleyelim
-        if updated_project:
-            st.write(f"Güncellenmiş Proje: {updated_project}")
+    # Proje Güncellemeleri
+    st.subheader(f"{selected_project['Proje Adı']} Proje Detayları")
+    display_cabinet(selected_project)
+    lamello_hole_positions()
 
-    # Üretim Adımları
-    manufacturing_steps()
+    # DXF ve Delik Pozisyonları
+    dxf_matching()
 
-# Ana program çalıştırma
+    # Teklif Şablonu
+    pdf_quote_template()
+
 if __name__ == "__main__":
     main_ui(projects)
