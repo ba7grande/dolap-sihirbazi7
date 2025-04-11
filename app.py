@@ -1,157 +1,138 @@
-import streamlit as st
-import pandas as pd
 import numpy as np
-import ezdxf
+import pandas as pd
 import qrcode
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
+import ezdxf
 from fpdf import FPDF
 
-# Proje Veri Yapısı
-class Project:
-    def __init__(self, name, panel_size, num_panels, num_doors, cost_per_m2):
-        self.name = name
-        self.panel_size = panel_size
-        self.num_panels = num_panels
-        self.num_doors = num_doors
-        self.cost_per_m2 = cost_per_m2
-        self.parts = []
+# Örnek proje verisi
+project = {
+    'parts': ['panel1', 'panel2', 'panel3', 'panel4'],
+    'measurements': {'width': 1000, 'height': 2000, 'depth': 500},
+    'hardware': {'screws': 20, 'minifix': 10, 'hinges': 5},  # Donanım verisi
+}
 
-    def add_part(self, part_name, part_type, dimensions):
-        self.parts.append({"name": part_name, "type": part_type, "dimensions": dimensions})
-
-    def calculate_total_cost(self):
-        panel_area = self.panel_size[0] * self.panel_size[1]
-        total_area = panel_area * self.num_panels
-        return total_area * self.cost_per_m2
-
-
-# Ölçü Girişi
-def input_project_details():
-    name = st.text_input("Proje Adı")
-    panel_length = st.number_input("Panel Uzunluğu (cm)", value=200)
-    panel_width = st.number_input("Panel Genişliği (cm)", value=100)
-    num_panels = st.number_input("Panel Sayısı", value=5)
-    num_doors = st.number_input("Kapak Sayısı", value=2)
-    cost_per_m2 = st.number_input("Metrekare Başına Maliyet (TL)", value=100)
-
-    project = Project(name, (panel_length, panel_width), num_panels, num_doors, cost_per_m2)
-    return project
-
-
-# Parça Listesi
-def generate_parts_list(project):
-    st.write("Parça Listesi:")
-    parts = project.parts
-    if len(parts) > 0:
-        parts_df = pd.DataFrame(parts)
-        st.write(parts_df)
+# Parça yerleşimi fonksiyonu (Akıllı fonksiyon)
+def smart_functions(project):
+    # 'project.parts' bir liste veya numpy array olmalı
+    if isinstance(project['parts'], (list, np.ndarray)):
+        # Eğer 'project.parts' doğru formatta ise
+        assembly_order = np.random.choice(project['parts'])
+        print(f"Assembly Order: {assembly_order}")
     else:
-        st.write("Henüz parça eklenmemiş.")
+        print("project.parts doğru formatta değil!")
 
+# PDF teklif şablonu oluşturma
+def generate_pdf(project):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    pdf.cell(200, 10, txt="Dolap Teklifi", ln=True, align='C')
+    
+    # Proje bilgileri ekleme
+    pdf.cell(200, 10, txt=f"Parça Listesi: {', '.join(project['parts'])}", ln=True)
+    pdf.cell(200, 10, txt=f"Ölçüler: {project['measurements']}", ln=True)
+    pdf.cell(200, 10, txt=f"Donanım: {project['hardware']}", ln=True)
+    
+    # PDF dosyasını kaydetme
+    pdf.output("project_quote.pdf")
+    print("PDF Teklif Oluşturuldu!")
 
-# Lamello Cabineo Delik Pozisyonları
-def generate_lamello_positions(project):
-    st.write("Lamello Delik Pozisyonları:")
-    positions = []
-    for i in range(project.num_panels):
-        positions.append({"Panel No": i + 1, "Delik X": np.random.randint(5, 30), "Delik Y": np.random.randint(5, 30)})
+# CSV çıktısı oluşturma
+def generate_csv(project):
+    data = {
+        'Part': project['parts'],
+        'Width': [project['measurements']['width']] * len(project['parts']),
+        'Height': [project['measurements']['height']] * len(project['parts']),
+        'Depth': [project['measurements']['depth']] * len(project['parts']),
+    }
+    df = pd.DataFrame(data)
+    df.to_csv('project_parts.csv', index=False)
+    print("CSV Dosyası Oluşturuldu!")
 
-    positions_df = pd.DataFrame(positions)
-    st.write(positions_df)
+# QR kod üretme ve barkod oluşturma
+def generate_qr_code(data, filename="qrcode.png"):
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(data)
+    qr.make(fit=True)
+    img = qr.make_image(fill='black', back_color='white')
+    img.save(filename)
+    print(f"QR Kodu {filename} olarak kaydedildi.")
 
-
-# CSV Çıktısı
-def export_to_csv(project):
-    parts_df = pd.DataFrame(project.parts)
-    csv_file = f"{project.name}_parca_listesi.csv"
-    parts_df.to_csv(csv_file, index=False)
-    st.write(f"CSV dosyası kaydedildi: {csv_file}")
-
-
-# Barkod ve Etiket Modülü
-def generate_labels_and_barcodes(project):
-    st.write("Barkod ve Etiketler:")
-    for part in project.parts:
-        qr = qrcode.make(part["name"])
-        img_path = f"{part['name']}_barkod.png"
-        qr.save(img_path)
-        st.image(img_path, caption=f"Barkod: {part['name']}")
-
-
-# CNC Entegrasyonu (DXF Çıktısı)
-def create_dxf(project):
-    st.write("DXF Çizimi Oluşturuluyor...")
+# CNC Entegrasyonu: DXF dosyası üretme
+def generate_dxf(project):
     doc = ezdxf.new()
     msp = doc.modelspace()
+    
+    # Basit bir dikdörtgen dolap çizimi
+    msp.add_lwpolyline([(0, 0), (0, project['measurements']['height']),
+                         (project['measurements']['width'], project['measurements']['height']),
+                         (project['measurements']['width'], 0), (0, 0)], close=True)
+    
+    doc.saveas('project.dxf')
+    print("DXF Dosyası Oluşturuldu!")
 
-    for i in range(project.num_panels):
-        msp.add_line((0, 0), (project.panel_size[0], 0))
-        msp.add_line((project.panel_size[0], 0), (project.panel_size[0], project.panel_size[1]))
-        msp.add_line((project.panel_size[0], project.panel_size[1]), (0, project.panel_size[1]))
-        msp.add_line((0, project.panel_size[1]), (0, 0))
-
-    dxf_file = f"{project.name}_panel.dxf"
-    doc.saveas(dxf_file)
-    st.write(f"DXF Dosyası kaydedildi: {dxf_file}")
-
-
-# 3D Görselleştirme
-def visualize_3d_cabinet(project):
-    st.write("3D Dolap Görselleştirmesi:")
+# 3D Görselleştirme (Matplotlib ile basit görselleştirme)
+def visualize_3d(project):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-
-    ax.scatter([0, project.panel_size[0]], [0, project.panel_size[1]], [0, 0], color="r", label="Dolap Alanı")
+    ax.bar3d([0, 0, 1], [0, 1, 1], [0, 0, 0], [project['measurements']['width']] * 3, [project['measurements']['height']] * 3, [project['measurements']['depth']] * 3)
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
+    plt.show()
 
-    st.pyplot(fig)
+# Donanım ve maliyet hesaplama
+def calculate_costs(project):
+    # Örnek maliyet hesaplaması
+    material_cost = (project['measurements']['width'] * project['measurements']['height']) * 0.02  # m² başına 0.02 TL
+    hardware_cost = sum(project['hardware'].values()) * 0.5  # Donanım başına 0.5 TL
+    total_cost = material_cost + hardware_cost
+    print(f"Malzeme Maliyeti: {material_cost:.2f} TL")
+    print(f"Donanım Maliyeti: {hardware_cost:.2f} TL")
+    print(f"Toplam Maliyet: {total_cost:.2f} TL")
+    return total_cost
 
+# Akıllı fonksiyonlar
+def optimize_materials(project):
+    # Malzeme optimizasyonu (basit örnek)
+    print("Malzeme optimizasyonu yapılıyor...")
+    optimized_layout = np.random.choice(project['parts'], size=len(project['parts']), replace=False)
+    print(f"Optimized layout: {optimized_layout}")
 
-# Donanım ve Maliyet Hesaplama
-def hardware_and_cost_calculation(project):
-    st.write("Donanım ve Maliyet Hesaplama:")
-    hardware_cost = {"Ray": 50, "Vida": 20, "Minifix": 30}
-    total_hardware_cost = (hardware_cost["Ray"] * project.num_doors) + (hardware_cost["Vida"] * project.num_panels)
-    total_cost = project.calculate_total_cost() + total_hardware_cost
-
-    st.write(f"Toplam Donanım Maliyeti: {total_hardware_cost} TL")
-    st.write(f"Toplam Maliyet: {total_cost} TL")
-
-
-# Akıllı Fonksiyonlar
-def smart_functions(project):
-    st.write("Akıllı Fonksiyonlar:")
-    
-    st.write("Otomatik Malzeme Optimizasyonu...")
-    material_layout = np.random.rand(5, 5)
-    plt.imshow(material_layout, cmap="gray")
-    st.pyplot(plt)
-    
-    production_time = np.random.randint(10, 100)
-    st.write(f"Üretim Tahmin Zamanı: {production_time} dakika")
-    
-    assembly_order = np.random.choice(project.parts)
-    st.write(f"Önerilen Montaj Sırası: {assembly_order['name']}")
-
-
-# Ana Arayüz ve Uygulama Başlatma
+# Ana fonksiyon
 def main():
-    st.title("Dolap Üretim Yazılımı")
+    print("Proje Başlatılıyor...")
     
-    project = input_project_details()
-
-    # Modülleri Başlat
-    generate_parts_list(project)
-    generate_lamello_positions(project)
-    export_to_csv(project)
-    generate_labels_and_barcodes(project)
-    create_dxf(project)
-    visualize_3d_cabinet(project)
-    hardware_and_cost_calculation(project)
+    # Smart Functions
     smart_functions(project)
     
+    # PDF Teklif Oluşturma
+    generate_pdf(project)
+    
+    # CSV Çıktısı Oluşturma
+    generate_csv(project)
+    
+    # QR Kod Üretimi
+    generate_qr_code('Parça QR Kodu')
+    
+    # CNC DXF Entegrasyonu
+    generate_dxf(project)
+    
+    # 3D Görselleştirme
+    visualize_3d(project)
+    
+    # Donanım ve Maliyet Hesaplama
+    calculate_costs(project)
+    
+    # Malzeme Optimizasyonu
+    optimize_materials(project)
+
+# Ana fonksiyonu çalıştır
 if __name__ == "__main__":
     main()
