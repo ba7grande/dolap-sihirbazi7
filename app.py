@@ -105,3 +105,32 @@ for i in range(bolme_sayisi):
 fig.update_layout(scene=dict(xaxis_title='X', yaxis_title='Y', zaxis_title='Z'), margin=dict(l=0, r=0, b=0, t=0))
 st.subheader("🧱 3D Katı Model ve Bağlantı Önizleme")
 st.plotly_chart(fig, use_container_width=True)
+
+# 🧩 Nesting Görseli
+st.subheader("🧩 Anlık Nesting Yerleşimi")
+fig2d, ax = plt.subplots(figsize=(6, 8))
+plaka_w, plaka_h = 2100, 2800
+x, y, max_y = 0, 0, 0
+ax.set_xlim(0, plaka_w)
+ax.set_ylim(0, plaka_h)
+ax.set_title("Plaka Yerleşimi")
+ax.set_xlabel("Genişlik")
+ax.set_ylabel("Yükseklik")
+plt.gca().invert_yaxis()
+
+for i, b in enumerate(bolmeler):
+    w, h = b["gen"], b["yuk"]
+    if x + w > plaka_w:
+        x = 0
+        y += max_y + 10
+        max_y = 0
+    if y + h > plaka_h:
+        continue
+    rect = plt.Rectangle((x, y), w, h, edgecolor='black', facecolor='lightgray')
+    ax.add_patch(rect)
+    ax.text(x + w/2, y + h/2, f"Bölme {i+1}", ha='center', va='center', fontsize=7)
+    x += w + 10
+    if h > max_y:
+        max_y = h
+
+st.pyplot(fig2d)
