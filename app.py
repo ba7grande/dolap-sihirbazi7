@@ -4,6 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from datetime import datetime
+from fpdf import FPDF
 
 # Örnek proje verisi
 projects = [
@@ -65,8 +66,6 @@ def display_cabinet(project):
 # Lamello Deliği ve Delik Pozisyonları
 def lamello_hole_positions():
     st.subheader("Lamello Delik Pozisyonları ve 3D Gösterimi")
-    # Bu bölümde Lamello deliklerinin hesaplanması ve 3D gösterilmesi yapılabilir.
-    # Basit bir örnek:
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
     ax.scatter([10, 20, 30], [10, 20, 30], [10, 20, 30], c='r', marker='o')  # Delik noktaları
@@ -95,8 +94,17 @@ def pdf_quote_template():
         st.write(f"Teklif Başlığı: {project_name}")
         st.write(f"Müşteri: {client_name}")
         st.write(f"Toplam Maliyet: {total_cost} TL")
-        st.write("Teklif başarıyla oluşturuldu.")
-        # Burada PDF şablonunun oluşturulması için ek bir kütüphane (örneğin, FPDF) kullanılabilir.
+        
+        # PDF Oluşturma
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("Arial", size=12)
+        pdf.cell(200, 10, txt="Teklif - " + project_name, ln=True, align='C')
+        pdf.cell(200, 10, txt=f"Müşteri: {client_name}", ln=True)
+        pdf.cell(200, 10, txt=f"Toplam Maliyet: {total_cost} TL", ln=True)
+        pdf.output(f"Teklif_{project_name}.pdf")
+
+        st.write("Teklif başarıyla oluşturuldu ve PDF'ye kaydedildi.")
 
 # Ana Kullanıcı Arayüzü
 def main_ui(projects):
