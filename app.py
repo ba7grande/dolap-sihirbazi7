@@ -3,135 +3,126 @@ import numpy as np
 import plotly.graph_objects as go
 import pandas as pd
 import matplotlib.pyplot as plt
+import ezdxf
+import os
 
 st.set_page_config(page_title="Dolap Sihirbazı 3D", layout="centered")
 st.title("🧱 Dolap Toplama ve Bağlantı Önizleme")
 
-st.subheader("📦 Malzeme Girişi ve Ayarlar")
-malzeme_adet = st.number_input("Panel Adedi", min_value=1, max_value=20, value=6)
-malzeme_genislik = st.number_input("Panel Genişliği (X)", value=600)
-malzeme_yukseklik = st.number_input("Panel Yüksekliği (Y)", value=720)
-malzeme_derinlik = st.number_input("Panel Derinliği (Z)", value=500)
+st.subheader("📦 Panel Türü ve Sayısı")
+panel_turleri = ["Yan Panel", "Orta Panel", "Kapak", "Çekmece"]
+panel_listesi = []
+
+for tur in panel_turleri:
+    adet = st.number_input(f"{tur} Adedi", min_value=0, max_value=10, value=2 if tur == "Yan Panel" else 1)
+    genislik = st.number_input(f"{tur} Genişliği (mm)", value=600 if tur != "Kapak" else 595)
+    yukseklik = st.number_input(f"{tur} Yüksekliği (mm)", value=720)
+    derinlik = st.number_input(f"{tur} Derinliği (mm)", value=500)
+    panel_listesi.append({"tur": tur, "adet": adet, "gen": genislik, "yuk": yukseklik, "der": derinlik})
+
 kalinlik = st.number_input("Panel Kalınlığı (mm)", value=18)
+raf_araligi = st.number_input("Raflar Arası Mesafe (cm)", value=30) * 10
+kenar_radius = st.number_input("Kenar Radius (mm)", value=0)
+kenarlar = st.multiselect("Radius Uygulanacak Kenarlar", ["Üst", "Alt", "Sağ", "Sol"])
 
 st.subheader("🔩 Donatı Seçenekleri")
 menteşe_adedi = st.number_input("Menteşe Sayısı", min_value=0, max_value=5, value=2)
+menteşe_cap = 35
 cabineo_yon = st.selectbox("Cabineo Delik Yönü", ["Üst", "Alt", "Sağ", "Sol", "Hepsi"])
 
 fig = go.Figure()
-renkler = ["red", "green", "blue", "orange", "purple", "gray"]
+renk_map = {"Yan Panel": "wheat", "Orta Panel": "burlywood", "Kapak": "lightblue", "Çekmece": "lightgray"}
+z_offset = 0
+kesim_listesi = []
 
-# Her panel için kutu oluştur
-for i in range(malzeme_adet):
-    x0, y0, z0 = 0, 0, i * (malzeme_derinlik + 30)
-    w, h, d = kalinlik, malzeme_yukseklik, malzeme_derinlik
-    x = [x0, x0+w, x0+w, x0, x0, x0+w, x0+w, x0]
-    y = [y0, y0, y0+h, y0+h, y0, y0, y0+h, y0+h]
-    z = [z0, z0, z0, z0, z0+d, z0+d, z0+d, z0+d]
-    fig.add_trace(go.Mesh3d(
-        x=x, y=y, z=z,
-        color=renkler[i % len(renkler)],
-        opacity=0.5,
-        name=f"Panel {i+1}"
-    ))
+if not os.path.exists("paneller"):
+    os.makedirs("paneller")
 
-# Silindir fonksiyonu (delik olarak çizim)
-def silindir_olustur(cx, cy, cz, r, h, eksen='x', segment=12):
-    theta = np.linspace(0, 2*np.pi, segment)
-    x = r * np.cos(theta)
-    y = r * np.sin(theta)
-    verts = []
-    for i in range(segment):
-        if eksen == 'x':
-            verts.append((cx - h/2, cy + x[i], cz + y[i]))
-            verts.append((cx + h/2, cy + x[i], cz + y[i]))
-        elif eksen == 'y':
-            verts.append((cx + x[i], cy - h/2, cz + y[i]))
-            verts.append((cx + x[i], cy + h/2, cz + y[i]))
-        else:
-            verts.append((cx + x[i], cy + y[i], cz - h/2))
-            verts.append((cx + x[i], cy + y[i], cz + h/2))
-    triangles = []
-    for i in range(0, len(verts)-2, 2):
-        triangles.append((i, i+1, i+3))
-        triangles.append((i, i+2, i+3))
-    x, y, z = zip(*verts)
-    i, j, k = zip(*triangles)
-    return x, y, z, i, j, k
+for p in panel_listesi:
+    for i in range(p["adet"]):
+        x0, y0, z0 = 0, 0, z_offset
+        w, h, d = kalinlik, p["yuk"], p["der"]
+        x = [x0, x0+w, x0+w, x0, x0, x0+w, x0+w, x0]
+        y = [y0, y0, y0+h, y0+h, y0, y0, y0+h, y0+h]
+        z = [z0, z0, z0, z0, z0+d, z0+d, z0+d, z0+d]
+        fig.add_trace(go.Mesh3d(x=x, y=y, z=z, color=renk_map.get(p["tur"], "wheat"), opacity=1.0, name=f"{p['tur']} {i+1}"))
 
-# Menteşe delikleri
-menteşe_delikler = []
-if menteşe_adedi > 0:
-    aralik = malzeme_yukseklik / (menteşe_adedi + 1)
-    for i in range(menteşe_adedi):
-        menteşe_delikler.append((kalinlik / 2, (i+1)*aralik, malzeme_derinlik + kalinlik / 2))
+        raf_sayisi = int(h // raf_araligi) if p["tur"] in ["Yan Panel", "Orta Panel"] else 0
+        for r in range(1, raf_sayisi):
+            ry = y0 + r * raf_araligi
+            fig.add_trace(go.Scatter3d(x=[x0+w/2], y=[ry], z=[z0+d/2], mode='markers', marker=dict(size=4, color='green'), name='Raf'))
 
-for x, y, z in menteşe_delikler:
-    sx, sy, sz, si, sj, sk = silindir_olustur(x, y, z, 17.5, kalinlik, 'z')
-    fig.add_trace(go.Mesh3d(x=sx, y=sy, z=sz, i=si, j=sj, k=sk, color='blue', opacity=0.9, name='Menteşe'))
+        kesim_listesi.append({"Parça": f"{p['tur']} {i+1}", "Genişlik": p["gen"], "Yükseklik": p["yuk"], "Kalınlık": kalinlik})
 
-# Cabineo delikleri (örnek: üst ve alt)
-cabineo_delikler = []
-if cabineo_yon in ["Üst", "Hepsi"]:
-    cabineo_delikler.append((kalinlik/2, kalinlik/2, malzeme_derinlik/2))
-if cabineo_yon in ["Alt", "Hepsi"]:
-    cabineo_delikler.append((kalinlik/2, malzeme_yukseklik - kalinlik/2, malzeme_derinlik/2))
-if cabineo_yon in ["Sol", "Hepsi"]:
-    cabineo_delikler.append((kalinlik/2, malzeme_yukseklik/2, kalinlik/2))
-if cabineo_yon in ["Sağ", "Hepsi"]:
-    cabineo_delikler.append((kalinlik/2, malzeme_yukseklik/2, malzeme_derinlik - kalinlik/2))
+        doc = ezdxf.new()
+        msp = doc.modelspace()
+        msp.add_lwpolyline([(0, 0), (p["gen"], 0), (p["gen"], p["yuk"]), (0, p["yuk"])], close=True)
+        msp.add_circle((35, 35), 5)
+        msp.add_circle((p["gen"] - 35, 35), 5)
+        msp.add_circle((35, p["yuk"] - 35), 5)
+        msp.add_circle((p["gen"] - 35, p["yuk"] - 35), 5)
+        doc.saveas(f"paneller/{p['tur'].lower()}_{i+1}.dxf")
+        z_offset += d + 30
 
-for x, y, z in cabineo_delikler:
-    sx, sy, sz, si, sj, sk = silindir_olustur(x, y, z, 6, kalinlik, 'x')
-    fig.add_trace(go.Mesh3d(x=sx, y=sy, z=sz, i=si, j=sj, k=sk, color='black', opacity=1.0, name='Cabineo'))
-
-fig.update_layout(scene=dict(
-    xaxis_title='X (Genişlik)',
-    yaxis_title='Y (Yükseklik)',
-    zaxis_title='Z (Derinlik)'
-), margin=dict(l=0, r=0, b=0, t=0))
-
+fig.update_layout(scene=dict(xaxis_title='X', yaxis_title='Y', zaxis_title='Z'), margin=dict(l=0, r=0, b=0, t=0))
 st.subheader("🧱 3D Katı Model ve Bağlantı Önizleme")
 st.plotly_chart(fig, use_container_width=True)
 
-# 2D Nesting Yerleşimi
-st.subheader("🧩 2D Nesting Yerleşim Görünümü")
-fig2d, ax = plt.subplots(figsize=(6, 8))
-plaka_gen = 2100
-plaka_yuk = 2800
-x, y = 0, 0
-max_y = 0
-paneller = []
+st.subheader("📋 Kesim Listesi")
+df = pd.DataFrame(kesim_listesi)
+st.dataframe(df)
 
-for i in range(malzeme_adet):
-    w = malzeme_genislik
-    h = malzeme_yukseklik
-    if x + w > plaka_gen:
+csv_buffer = df.to_csv(index=False).encode()
+st.download_button("📥 Kesim Listesini İndir (CSV)", data=csv_buffer, file_name="kesim_listesi.csv", mime="text/csv")
+
+st.subheader("🧩 Nesting Yerleşim Planı")
+fig2d, ax = plt.subplots(figsize=(6, 8))
+x, y, max_y = 0, 0, 0
+plaka_w, plaka_h = 2100, 2800
+for i, row in df.iterrows():
+    w, h = row["Genişlik"], row["Yükseklik"]
+    if x + w > plaka_w:
         x = 0
         y += max_y + 10
         max_y = 0
-    if y + h > plaka_yuk:
-        st.warning(f"Panel {i+1} plakaya sığmadı, atlandı.")
+    if y + h > plaka_h:
         continue
     rect = plt.Rectangle((x, y), w, h, edgecolor='black', facecolor='lightgray')
     ax.add_patch(rect)
-    ax.text(x + w/2, y + h/2, f"Panel {i+1}", ha='center', va='center')
-    paneller.append({"Panel": f"Panel {i+1}", "Genişlik": w, "Yükseklik": h})
+    ax.text(x + w/2, y + h/2, row["Parça"], ha='center', va='center', fontsize=6)
     x += w + 10
     if h > max_y:
         max_y = h
 
-ax.set_xlim(0, plaka_gen)
-ax.set_ylim(0, plaka_yuk)
-ax.set_title("Plaka Üzerine Yerleşim")
-ax.set_xlabel("Genişlik (mm)")
-ax.set_ylabel("Yükseklik (mm)")
+ax.set_xlim(0, plaka_w)
+ax.set_ylim(0, plaka_h)
 plt.gca().invert_yaxis()
 st.pyplot(fig2d)
 
-# Kesim listesi göster
-st.subheader("📋 Kesim Listesi")
-df = pd.DataFrame(paneller)
-st.dataframe(df)
+st.success("✅ Tüm çıktılar hazır: 3D model, DXF, CSV ve nesting görselleştirmesi")
 
-st.success("✅ 3D görünüm, bağlantılar ve nesting başarıyla oluşturuldu!")
+# 🔄 Nesting DXF Çıktısı
+if not os.path.exists("nesting"):
+    os.makedirs("nesting")
+
+nesting_dxf = ezdxf.new()
+nesting_msp = nesting_dxf.modelspace()
+x, y, max_y = 0, 0, 0
+
+for i, row in df.iterrows():
+    w, h = row["Genişlik"], row["Yükseklik"]
+    if x + w > plaka_w:
+        x = 0
+        y += max_y + 10
+        max_y = 0
+    if y + h > plaka_h:
+        continue
+    nesting_msp.add_lwpolyline([(x, y), (x + w, y), (x + w, y + h), (x, y + h)], close=True)
+    nesting_msp.add_text(row["Parça"], dxfattribs={"height": 10}).set_pos((x + 10, y + 10))
+    x += w + 10
+    if h > max_y:
+        max_y = h
+
+nesting_path = "nesting/nesting_plan.dxf"
+nesting_dxf.saveas(nesting_path)
+st.download_button("📥 Nesting DXF Planını İndir", data=open(nesting_path, "rb"), file_name="nesting_plan.dxf")
