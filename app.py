@@ -58,6 +58,8 @@ def add_cabineo(x, y, z):
     fig.add_trace(go.Mesh3d(x=[x - hw, x + hw, x + hw, x - hw], y=[y - hw, y - hw, y + hw, y + hw], z=[z + 11] * 4, i=[0], j=[1], k=[2], color='gray', name='Cabineo Başlık', opacity=1.0))
 
 # Panel üretimi ve çizim
+ray_genislik = 45  # Ray için sabit genişlik
+ray_renk = 'red'
 
 bolmeler = []
 if not os.path.exists("paneller"):
@@ -91,6 +93,23 @@ for i in range(bolme_sayisi):
     panel_dxf.saveas(panel_path)
 
     # 3D Görünüm için delikler
+    # Çekmece rayları
+    if cekmece_sayisi > 0:
+        ray_yukseklik = yuk // (cekmece_sayisi + 1)
+        for r in range(cekmece_sayisi):
+            y_pos = (r + 1) * ray_yukseklik
+            fig.add_trace(go.Mesh3d(
+                x=[0, ray_genislik, ray_genislik, 0, 0, ray_genislik, ray_genislik, 0],
+                y=[y_pos, y_pos, y_pos + 10, y_pos + 10]*2,
+                z=[der, der, der, der, der - 5, der - 5, der - 5, der - 5],
+                color=ray_renk, opacity=1.0, name=f"Ray Sol {r+1}"
+            ))
+            fig.add_trace(go.Mesh3d(
+                x=[gen - ray_genislik, gen, gen, gen - ray_genislik, gen - ray_genislik, gen, gen, gen - ray_genislik],
+                y=[y_pos, y_pos, y_pos + 10, y_pos + 10]*2,
+                z=[der, der, der, der, der - 5, der - 5, der - 5, der - 5],
+                color=ray_renk, opacity=1.0, name=f"Ray Sağ {r+1}"
+            ))
     add_cabineo(37, yuk / 2, der)
     add_cabineo(gen - 37, yuk / 2, der)
     add_cabineo(gen / 2, 37, der)
