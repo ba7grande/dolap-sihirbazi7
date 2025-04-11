@@ -4,3 +4,8 @@ fpdf2
 qrcode[pil]
 numpy
 pythreejs
+qrcode[pil]
+Pillow
+fpdf
+streamlit
+
