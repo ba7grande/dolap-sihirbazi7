@@ -1,154 +1,92 @@
 import streamlit as st
 import numpy as np
-import pandas as pd
-import qrcode
-from PIL import Image
-import io
 from fpdf import FPDF
+import qrcode
+import pyautogui
+import plotly.graph_objects as go
+from pythreejs import *  # 3D render için
 
-# QR Kod Üretimi
+# Proje veri yapısı
+class Project:
+    def __init__(self, width, height, depth):
+        self.width = width
+        self.height = height
+        self.depth = depth
+        self.parts = []
+        self.material_cost = 0
+        self.hardware_cost = 0
+        self.assembly_order = []
+        self.dxf_output = ""
+
+    def add_part(self, part):
+        self.parts.append(part)
+
+    def set_material_cost(self, cost):
+        self.material_cost = cost
+
+    def set_hardware_cost(self, cost):
+        self.hardware_cost = cost
+
+# 3D görselleştirme
+def generate_3d_view(project):
+    # Burada, streamlit ile uyumlu olarak 3D görselleştirme kodu olacak
+    # Pythreejs veya başka bir kütüphane kullanılabilir
+    pass
+
+# DXF çıktı üretimi
+def generate_dxf(project):
+    # Burada DXF dosyalarını üretmek için kod olacak
+    pass
+
+# QR Kod üretimi
 def generate_qr_code(data):
-    qr = qrcode.QRCode(
-        version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_L,
-        box_size=10,
-        border=4,
-    )
+    qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_L,
+                       box_size=10, border=4)
     qr.add_data(data)
     qr.make(fit=True)
-    
-    # QR kodu PIL formatında elde etme
     img = qr.make_image(fill='black', back_color='white')
+    return img
 
-    # Streamlit'e göndermeden önce PIL Image formatına dönüştür
-    img_buffer = io.BytesIO()
-    img.save(img_buffer, format="PNG")
-    img_buffer.seek(0)
-    
-    return img_buffer
-
-# PDF Üretimi
+# PDF Teklif Raporu
 def generate_pdf(project):
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_font('Arial', 'B', 12)
+    pdf.set_font("Arial", size=12)
     
-    # Başlık
-    pdf.cell(200, 10, txt="Dolap Üretim Teklifi", ln=True, align='C')
-
-    # Proje Bilgileri
-    pdf.cell(200, 10, txt=f"Proje Adı: {project['name']}", ln=True)
-    pdf.cell(200, 10, txt=f"Genişlik: {project['width']} mm", ln=True)
-    pdf.cell(200, 10, txt=f"Yükseklik: {project['height']} mm", ln=True)
-    pdf.cell(200, 10, txt=f"Derinlik: {project['depth']} mm", ln=True)
-
-    # Parça listesi
-    pdf.cell(200, 10, txt="Parçalar:", ln=True)
-    for part in project['parts']:
-        pdf.cell(200, 10, txt=f"{part['name']} - {part['quantity']} adet", ln=True)
-
-    # QR Kod
-    qr_code_image = generate_qr_code(str(project['parts']))
-    pdf.ln(10)  # boşluk ekle
-    pdf.image(qr_code_image, x=10, w=50)
-
+    pdf.cell(200, 10, txt=f"Project Dimensions: {project.width} x {project.height} x {project.depth}", ln=True)
+    pdf.cell(200, 10, txt=f"Material Cost: {project.material_cost} USD", ln=True)
+    pdf.cell(200, 10, txt=f"Hardware Cost: {project.hardware_cost} USD", ln=True)
     pdf.output("project_quote.pdf")
 
-# Akıllı Fonksiyonlar - Montaj sırası önerisi ve malzeme optimizasyonu
-def smart_functions(project):
-    # Malzeme optimizasyonu ve montaj sırası
-    assembly_order = np.random.choice(project['parts'])
-    st.write(f"Montaj sırası: {assembly_order['name']}")
-
-    # Montaj sırası önerisi ve malzeme optimizasyonu
-    st.write("Malzeme optimizasyonu yapılıyor...")
-
-# 3D Görselleştirme - Basit Görselleştirme
-def visualize_3d(project):
-    st.subheader("3D Görselleştirme")
-    st.write(f"{project['name']} için 3D dolap modeli")
-
-# Ölçü Girişi ve Parça Listesi
-def get_dimensions_and_parts():
-    st.subheader("Dolap Ölçüleri")
-    project_width = st.number_input("Dolap Genişliği (mm)", min_value=0)
-    project_height = st.number_input("Dolap Yüksekliği (mm)", min_value=0)
-    project_depth = st.number_input("Dolap Derinliği (mm)", min_value=0)
-
-    parts = []
-    part_name = st.text_input("Parça Adı")
-    part_qty = st.number_input("Adet", min_value=1)
-
-    if st.button("Parça Ekle"):
-        parts.append({'name': part_name, 'quantity': part_qty})
-        st.success(f"{part_name} eklendi.")
-
-    return project_width, project_height, project_depth, parts
-
-# CNC Entegrasyonu (Örnek)
-def cnc_integration(project):
-    st.subheader("CNC Entegrasyonu")
-    st.write(f"{project['name']} için DXF/G-code çıktısı oluşturuluyor...")
-    # Gerçek CNC entegrasyonu burada yapılabilir
-
-# DXF Çıktısı
-def generate_dxf(project):
-    st.subheader("DXF Çıktısı")
-    st.write(f"Projeye ait DXF çıktısı oluşturuluyor...")
-    # DXF dosyası oluşturma işlemi buraya eklenebilir
-
-# Parça Listesi Oluşturma
-def create_parts_list(project):
-    st.subheader("Parça Listesi")
-    for part in project['parts']:
-        st.write(f"{part['name']} - {part['quantity']} adet")
-
-# Ana Uygulama Arayüzü
+# Ana UI
 def main_ui():
-    st.title("Dolap Üretim Sistemi")
+    st.title("Fithole Benzeri Dolap Üretim Yazılımı")
 
-    # Proje Bilgilerini Girme
-    project_name = st.text_input("Proje Adı")
-    project_width, project_height, project_depth, parts = get_dimensions_and_parts()
+    # Proje oluşturma
+    st.sidebar.header("Proje Girişi")
+    width = st.sidebar.number_input("Dolap Genişliği (cm)", min_value=50, max_value=500, value=120)
+    height = st.sidebar.number_input("Dolap Yüksekliği (cm)", min_value=100, max_value=300, value=200)
+    depth = st.sidebar.number_input("Dolap Derinliği (cm)", min_value=30, max_value=100, value=60)
 
-    if st.button("Yeni Proje Oluştur"):
-        project = {
-            'name': project_name,
-            'width': project_width,
-            'height': project_height,
-            'depth': project_depth,
-            'parts': parts
-        }
-        st.session_state.project = project
-        st.success("Proje oluşturuldu.")
+    project = Project(width, height, depth)
 
-    # Proje Var mı Kontrol Etme
-    if 'project' in st.session_state:
-        st.subheader("Parça Listesi")
-        create_parts_list(st.session_state.project)
-
+    if st.sidebar.button("Oluştur"):
+        st.sidebar.write(f"Proje: {width} x {height} x {depth} cm")
         # 3D Görselleştirme
-        visualize_3d(st.session_state.project)
+        generate_3d_view(project)
 
-        # Akıllı Fonksiyonlar
-        smart_functions(st.session_state.project)
+        # DXF çıktısı
+        generate_dxf(project)
 
-        # CNC Entegrasyonu
-        cnc_integration(st.session_state.project)
+        # QR Kod
+        qr_code_image = generate_qr_code(f"Project: {width}x{height}x{depth}")
+        st.image(qr_code_image, caption="QR Code for Project")
 
-        # DXF Çıktısı
-        generate_dxf(st.session_state.project)
+        # PDF Teklif Raporu
+        generate_pdf(project)
+        st.write("PDF raporu başarıyla oluşturuldu!")
 
-        # PDF Oluşturma
-        if st.button("Teklif PDF'ini Oluştur"):
-            generate_pdf(st.session_state.project)
-            st.success("Teklif PDF'i oluşturuldu.")
-
-        # QR Kod Görüntüleme
-        qr_code_image = generate_qr_code(str(st.session_state.project['parts']))
-        st.image(qr_code_image)
-
-# Ana Fonksiyon
+# Main fonksiyonu
 def main():
     main_ui()
 
