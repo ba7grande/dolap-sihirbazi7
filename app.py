@@ -1,53 +1,48 @@
-import { useState } from 'react';
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Input } from "@/components/ui/input";
+import streamlit as st
+import pandas as pd
 
-export default function Dashboard() {
-  const [orders, setOrders] = useState([
-    { id: 1, title: 'Mutfak Dolabı', status: 'Beklemede' },
-    { id: 2, title: 'TV Ünitesi', status: 'Üretimde' },
-  ]);
+# Sayfa yapılandırması
+st.set_page_config(page_title="Üretim Paneli", layout="wide")
 
-  const statuses = ['Beklemede', 'Üretimde', 'Tamamlandı', 'Teslim Edildi'];
+st.title("🛠️ Üretim Takip Paneli")
 
-  return (
-    <div className="p-6 space-y-4">
-      <h1 className="text-2xl font-bold">Üretim Paneli</h1>
-      <Tabs defaultValue="Beklemede">
-        <TabsList className="flex gap-2">
-          {statuses.map((status) => (
-            <TabsTrigger key={status} value={status}>{status}</TabsTrigger>
-          ))}
-        </TabsList>
+# Örnek sipariş verileri
+if "orders" not in st.session_state:
+    st.session_state.orders = pd.DataFrame([
+        {"ID": 1, "Ürün": "Mutfak Dolabı", "Durum": "Beklemede"},
+        {"ID": 2, "Ürün": "TV Ünitesi", "Durum": "Üretimde"},
+    ])
 
-        {statuses.map((status) => (
-          <TabsContent key={status} value={status}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-              {orders.filter(order => order.status === status).map(order => (
-                <Card key={order.id}>
-                  <CardContent className="p-4">
-                    <h2 className="text-lg font-semibold">{order.title}</h2>
-                    <p>Durum: {order.status}</p>
-                    <Button
-                      variant="outline"
-                      className="mt-2"
-                      onClick={() => {
-                        const nextStatusIndex = (statuses.indexOf(order.status) + 1) % statuses.length;
-                        const updatedOrders = orders.map(o => o.id === order.id ? { ...o, status: statuses[nextStatusIndex] } : o);
-                        setOrders(updatedOrders);
-                      }}
-                    >
-                      Durumu Güncelle
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </TabsContent>
-        ))}
-      </Tabs>
-    </div>
-  );
-}
+statuses = ["Beklemede", "Üretimde", "Tamamlandı", "Teslim Edildi"]
+
+# Sipariş Ekleme
+with st.expander("➕ Yeni Sipariş Ekle"):
+    with st.form("siparis_form"):
+        urun = st.text_input("Ürün Adı")
+        durum = st.selectbox("Durum", statuses)
+        submitted = st.form_submit_button("Ekle")
+        if submitted and urun:
+            new_id = st.session_state.orders["ID"].max() + 1 if not st.session_state.orders.empty else 1
+            new_row = {"ID": new_id, "Ürün": urun, "Durum": durum}
+            st.session_state.orders.loc[len(st.session_state.orders)] = new_row
+            st.success("Sipariş eklendi!")
+
+# Duruma göre siparişleri göster
+tabs = st.tabs(statuses)
+for i, durum in enumerate(statuses):
+    with tabs[i]:
+        df = st.session_state.orders[st.session_state.orders["Durum"] == durum]
+        st.subheader(f"{durum} Siparişler")
+        st.dataframe(df, use_container_width=True)
+
+# Durum Güncelleme
+st.subheader("🔄 Sipariş Durumu Güncelle")
+selected_id = st.number_input("Sipariş ID", min_value=1, step=1)
+new_status = st.selectbox("Yeni Durum", statuses, key="update")
+if st.button("Güncelle"):
+    idx = st.session_state.orders[st.session_state.orders["ID"] == selected_id].index
+    if not idx.empty:
+        st.session_state.orders.at[idx[0], "Durum"] = new_status
+        st.success("Durum güncellendi.")
+    else:
+        st.error("Bu ID'ye sahip sipariş bulunamadı.")
