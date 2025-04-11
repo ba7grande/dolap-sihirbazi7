@@ -28,19 +28,14 @@ paneller = [
     {"isim": "kapak", "w": genislik, "h": yukseklik}
 ]
 
-# Panel çizim fonksiyonu
 def dxf_ciz(panel, klasor, delik_offset=37, delik_cap=5, raflar=False, menteşe_yap=False):
     w, h = panel["w"], panel["h"]
     doc = ezdxf.new()
     msp = doc.modelspace()
     msp.add_lwpolyline([(0, 0), (w, 0), (w, h), (0, h)], close=True)
-
-    # 4 köşe delik
     for x in [delik_offset, w - delik_offset]:
         for y in [delik_offset, h - delik_offset]:
             msp.add_circle((x, y), delik_cap)
-
-    # Raf delikleri (sadece yan panellerde)
     if raflar:
         bolme_sayisi = raf_sayisi + 1
         aralik = h / bolme_sayisi
@@ -48,8 +43,6 @@ def dxf_ciz(panel, klasor, delik_offset=37, delik_cap=5, raflar=False, menteşe_
             y_raf = i * aralik
             msp.add_circle((delik_offset, y_raf), 3)
             msp.add_circle((w - delik_offset, y_raf), 3)
-
-    # Menteşe delikleri (kapakta)
     if menteşe_yap:
         menteşe_yerleri = [100]
         if menteşe_adedi == 3:
@@ -57,11 +50,9 @@ def dxf_ciz(panel, klasor, delik_offset=37, delik_cap=5, raflar=False, menteşe_
         menteşe_yerleri.append(h - 100)
         for y in menteşe_yerleri:
             msp.add_circle((delik_offset, y), 5)
-
     os.makedirs(klasor, exist_ok=True)
     doc.saveas(f"{klasor}/{panel['isim']}.dxf")
 
-# DXF, CSV ve Nesting üretimi
 if st.button("📁 DXF + Nesting + CSV Üret"):
     klasor = "paneller_dxf"
     for p in paneller:
@@ -71,14 +62,13 @@ if st.button("📁 DXF + Nesting + CSV Üret"):
         elif p["isim"] == "kapak":
             dxf_ciz(p, klasor, menteşe_yap=True)
 
-    # Kesim listesi CSV
     df = pd.DataFrame([
         {"Parça": p["isim"], "Genişlik": int(p["w"]), "Yükseklik": int(p["h"]), "Adet": 1}
         for p in paneller
     ])
     df.to_csv("kesim_listesi.csv", index=False)
 
-    # Nesting (basit yerleştirme)
+    # Nesting işlemi
     doc = ezdxf.new()
     msp = doc.modelspace()
     x, y, max_y = 0, 0, 0
@@ -89,7 +79,6 @@ if st.button("📁 DXF + Nesting + CSV Üret"):
         file = f"{klasor}/{p['isim']}.dxf"
         if not os.path.exists(file):
             continue
-
         panel_doc = ezdxf.readfile(file)
         panel_msp = panel_doc.modelspace()
         w, h = p["w"], p["h"]
@@ -116,4 +105,16 @@ if st.button("📁 DXF + Nesting + CSV Üret"):
 
     doc.saveas("yerlesim.dxf")
     st.success("✅ DXF, nesting ve kesim listesi üretildi!")
-    st.info("📁 paneller_dxf/  | 📄 kesim_listesi.csv  | 🧩 yerlesim.dxf")
+
+    # 📥 İndirme Butonları
+    with open("kesim_listesi.csv", "rb") as f:
+        st.download_button("📥 Kesim Listesini İndir", f, file_name="kesim_listesi.csv")
+
+    with open("yerlesim.dxf", "rb") as f:
+        st.download_button("📥 Yerleşim DXF'ini İndir", f, file_name="yerlesim.dxf")
+
+    for p in paneller:
+        dosya_yolu = f"{klasor}/{p['isim']}.dxf"
+        if os.path.exists(dosya_yolu):
+            with open(dosya_yolu, "rb") as f:
+                st.download_button(f"📥 {p['isim']} DXF indir", f, file_name=f"{p['isim']}.dxf")
