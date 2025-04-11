@@ -5,109 +5,71 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import ezdxf
 import os
+from fpdf import FPDF
 
-st.set_page_config(page_title="Dolap Sihirbazı 3D", layout="centered")
-st.title("🧱 Dolap Toplama ve Bağlantı Önizleme")
+st.set_page_config(page_title="Dolap Sihirbazı 3D", layout="wide")
+st.title("🧱 Çoklu Kapak ve Çekmece Yapılandırmalı Dolap Tasarımı")
 
-st.subheader("📦 Panel Türü ve Sayısı")
-panel_turleri = ["Yan Panel", "Orta Panel", "Kapak", "Çekmece"]
-panel_listesi = []
+st.sidebar.header("🔧 Genel Ayarlar")
+kalinlik = st.sidebar.number_input("Panel Kalınlığı (mm)", value=18)
+raf_araligi = st.sidebar.number_input("Raflar Arası Mesafe (cm)", value=30) * 10
+menteşe_adedi = st.sidebar.number_input("Menteşe Sayısı", min_value=0, max_value=5, value=2)
+cabineo_yon = st.sidebar.selectbox("Cabineo Delik Yönü", ["Üst", "Alt", "Sağ", "Sol", "Hepsi"])
 
-for tur in panel_turleri:
-    adet = st.number_input(f"{tur} Adedi", min_value=0, max_value=10, value=2 if tur == "Yan Panel" else 1)
-    genislik = st.number_input(f"{tur} Genişliği (mm)", value=600 if tur != "Kapak" else 595)
-    yukseklik = st.number_input(f"{tur} Yüksekliği (mm)", value=720)
-    derinlik = st.number_input(f"{tur} Derinliği (mm)", value=500)
-    panel_listesi.append({"tur": tur, "adet": adet, "gen": genislik, "yuk": yukseklik, "der": derinlik})
+st.sidebar.header("📐 Dolap Bölmeleri")
+bolme_sayisi = st.sidebar.number_input("Bölme Sayısı", min_value=1, max_value=10, value=1)
 
-kalinlik = st.number_input("Panel Kalınlığı (mm)", value=18)
-raf_araligi = st.number_input("Raflar Arası Mesafe (cm)", value=30) * 10
-kenar_radius = st.number_input("Kenar Radius (mm)", value=0)
-kenarlar = st.multiselect("Radius Uygulanacak Kenarlar", ["Üst", "Alt", "Sağ", "Sol"])
-
-st.subheader("🔩 Donatı Seçenekleri")
-menteşe_adedi = st.number_input("Menteşe Sayısı", min_value=0, max_value=5, value=2)
-menteşe_cap = 35
-cabineo_yon = st.selectbox("Cabineo Delik Yönü", ["Üst", "Alt", "Sağ", "Sol", "Hepsi"])
+bolmeler = []
+for i in range(bolme_sayisi):
+    st.subheader(f"📦 Bölme {i+1} Yapılandırması")
+    gen = st.number_input(f"Bölme {i+1} Genişlik (mm)", value=600, key=f"gen{i}")
+    yuk = st.number_input(f"Bölme {i+1} Yükseklik (mm)", value=720, key=f"yuk{i}")
+    der = st.number_input(f"Bölme {i+1} Derinlik (mm)", value=500, key=f"der{i}")
+    kapak_sayisi = st.number_input(f"Kapak Sayısı", min_value=0, value=1, key=f"kapak{i}")
+    cekmece_sayisi = st.number_input(f"Çekmece Sayısı", min_value=0, value=0, key=f"cekmece{i}")
+    bolmeler.append({
+        "gen": gen, "yuk": yuk, "der": der,
+        "kapak": kapak_sayisi,
+        "cekmece": cekmece_sayisi
+    })
 
 fig = go.Figure()
-renk_map = {"Yan Panel": "wheat", "Orta Panel": "burlywood", "Kapak": "lightblue", "Çekmece": "lightgray"}
 z_offset = 0
 kesim_listesi = []
 
 if not os.path.exists("paneller"):
     os.makedirs("paneller")
+if not os.path.exists("nesting"):
+    os.makedirs("nesting")
+if not os.path.exists("etiketler"):
+    os.makedirs("etiketler")
 
-for p in panel_listesi:
-    for i in range(p["adet"]):
-        x0, y0, z0 = 0, 0, z_offset
-        w, h, d = kalinlik, p["yuk"], p["der"]
-        x = [x0, x0+w, x0+w, x0, x0, x0+w, x0+w, x0]
-        y = [y0, y0, y0+h, y0+h, y0, y0, y0+h, y0+h]
-        z = [z0, z0, z0, z0, z0+d, z0+d, z0+d, z0+d]
-        fig.add_trace(go.Mesh3d(x=x, y=y, z=z, color=renk_map.get(p["tur"], "wheat"), opacity=1.0, name=f"{p['tur']} {i+1}"))
-
-        raf_sayisi = int(h // raf_araligi) if p["tur"] in ["Yan Panel", "Orta Panel"] else 0
-        for r in range(1, raf_sayisi):
-            ry = y0 + r * raf_araligi
-            fig.add_trace(go.Scatter3d(x=[x0+w/2], y=[ry], z=[z0+d/2], mode='markers', marker=dict(size=4, color='green'), name='Raf'))
-
-        kesim_listesi.append({"Parça": f"{p['tur']} {i+1}", "Genişlik": p["gen"], "Yükseklik": p["yuk"], "Kalınlık": kalinlik})
-
-        doc = ezdxf.new()
-        msp = doc.modelspace()
-        msp.add_lwpolyline([(0, 0), (p["gen"], 0), (p["gen"], p["yuk"]), (0, p["yuk"])], close=True)
-        msp.add_circle((35, 35), 5)
-        msp.add_circle((p["gen"] - 35, 35), 5)
-        msp.add_circle((35, p["yuk"] - 35), 5)
-        msp.add_circle((p["gen"] - 35, p["yuk"] - 35), 5)
-        doc.saveas(f"paneller/{p['tur'].lower()}_{i+1}.dxf")
-        z_offset += d + 30
+for i, b in enumerate(bolmeler):
+    for j in range(2):
+        kesim_listesi.append({"Parça": f"Yan Panel {j+1} Bölme {i+1}", "Genişlik": b["yuk"], "Yükseklik": b["der"], "Kalınlık": kalinlik})
+    for k in range(b["kapak"]):
+        kesim_listesi.append({"Parça": f"Kapak {k+1} Bölme {i+1}", "Genişlik": b["gen"], "Yükseklik": b["yuk"], "Kalınlık": kalinlik})
+    for c in range(b["cekmece"]):
+        yuk_parca = b["yuk"] // (b["cekmece"] or 1)
+        kesim_listesi.append({"Parça": f"Çekmece {c+1} Bölme {i+1}", "Genişlik": b["gen"], "Yükseklik": yuk_parca, "Kalınlık": kalinlik})
+    z_offset += b["gen"] + 50
 
 fig.update_layout(scene=dict(xaxis_title='X', yaxis_title='Y', zaxis_title='Z'), margin=dict(l=0, r=0, b=0, t=0))
-st.subheader("🧱 3D Katı Model ve Bağlantı Önizleme")
+st.subheader("🧱 3D Katı Model ve Bölme Görünümü")
 st.plotly_chart(fig, use_container_width=True)
 
 st.subheader("📋 Kesim Listesi")
 df = pd.DataFrame(kesim_listesi)
 st.dataframe(df)
-
 csv_buffer = df.to_csv(index=False).encode()
 st.download_button("📥 Kesim Listesini İndir (CSV)", data=csv_buffer, file_name="kesim_listesi.csv", mime="text/csv")
 
-st.subheader("🧩 Nesting Yerleşim Planı")
-fig2d, ax = plt.subplots(figsize=(6, 8))
-x, y, max_y = 0, 0, 0
+# 🔄 Nesting DXF
+st.subheader("🧩 Nesting Planı (DXF)")
 plaka_w, plaka_h = 2100, 2800
-for i, row in df.iterrows():
-    w, h = row["Genişlik"], row["Yükseklik"]
-    if x + w > plaka_w:
-        x = 0
-        y += max_y + 10
-        max_y = 0
-    if y + h > plaka_h:
-        continue
-    rect = plt.Rectangle((x, y), w, h, edgecolor='black', facecolor='lightgray')
-    ax.add_patch(rect)
-    ax.text(x + w/2, y + h/2, row["Parça"], ha='center', va='center', fontsize=6)
-    x += w + 10
-    if h > max_y:
-        max_y = h
-
-ax.set_xlim(0, plaka_w)
-ax.set_ylim(0, plaka_h)
-plt.gca().invert_yaxis()
-st.pyplot(fig2d)
-
-st.success("✅ Tüm çıktılar hazır: 3D model, DXF, CSV ve nesting görselleştirmesi")
-
-# 🔄 Nesting DXF Çıktısı
-if not os.path.exists("nesting"):
-    os.makedirs("nesting")
-
+x, y, max_y = 0, 0, 0
 nesting_dxf = ezdxf.new()
 nesting_msp = nesting_dxf.modelspace()
-x, y, max_y = 0, 0, 0
 
 for i, row in df.iterrows():
     w, h = row["Genişlik"], row["Yükseklik"]
@@ -127,3 +89,19 @@ for i, row in df.iterrows():
 nesting_path = "nesting/nesting_plan.dxf"
 nesting_dxf.saveas(nesting_path)
 st.download_button("📥 Nesting DXF Planını İndir", data=open(nesting_path, "rb"), file_name="nesting_plan.dxf")
+
+# 🖨️ Etiket PDF üretimi
+st.subheader("🏷️ PDF Etiket Üretimi")
+pdf = FPDF()
+pdf.set_auto_page_break(auto=True, margin=15)
+
+for row in df.itertuples():
+    pdf.add_page()
+    pdf.set_font("Arial", size=24)
+    pdf.cell(200, 20, txt=f"{row.Parça}", ln=True, align="C")
+    pdf.set_font("Arial", size=16)
+    pdf.cell(200, 10, txt=f"{row.Genişlik} x {row.Yükseklik} x {row.Kalınlık} mm", ln=True, align="C")
+
+etiket_path = "etiketler/etiketler.pdf"
+pdf.output(etiket_path)
+st.download_button("📥 PDF Etiketleri İndir", data=open(etiket_path, "rb"), file_name="etiketler.pdf")
