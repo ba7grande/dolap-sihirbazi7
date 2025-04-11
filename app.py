@@ -34,7 +34,7 @@ def hardware_list(project):
     total_cost = sum(hardware_items.values()) * (project["Kapak Sayısı"] + project["Panel Sayısı"])
     st.write(f"Toplam Donanım Maliyeti: {total_cost} TL")
 
-# DXF Çizim Çıkartma
+# DXF Çizimi Oluşturma
 def create_dxf(project):
     st.subheader("DXF Çizimi Oluşturma")
     doc = ezdxf.new()
