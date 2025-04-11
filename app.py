@@ -79,20 +79,147 @@ def display_cabinet(project):
     ax.set_title('Basit 3D Dolap Görselleştirmesi')
     st.pyplot(fig)
 
-# Ana Kullanıcı Arayüzü
+# Kapak Çizimi ve Açılır/Kapalı Görünüm
+def door_visualization(project):
+    st.subheader("Kapak Çizimi ve Açılır/Kapalı Görünüm")
+    
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    width = 50  # Kapak genişliği
+    height = 200  # Kapak yüksekliği
+    depth = 3  # Kapak kalınlığı
+    
+    # Kapak açıkken çizimi
+    ax.bar3d(0, 0, 0, width, depth, height, color='blue', alpha=0.5)
+    ax.set_xlabel('Width')
+    ax.set_ylabel('Depth')
+    ax.set_zlabel('Height')
+    ax.set_title('Kapak Açık')
+    st.pyplot(fig)
+    
+    # Kapak kapalıyken çizimi
+    ax.cla()  # Temizle
+    ax.bar3d(0, 0, 0, width, depth, height, color='green', alpha=0.8)
+    ax.set_xlabel('Width')
+    ax.set_ylabel('Depth')
+    ax.set_zlabel('Height')
+    ax.set_title('Kapak Kapalı')
+    st.pyplot(fig)
+
+# Lamello Deliği Pozisyonlarının 3D Gösterimi
+def lamello_hole_visualization(project):
+    st.subheader("Lamello Deliği Pozisyonlarının 3D Gösterimi")
+    
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    
+    # Basit Lamello deliği çizimi
+    width = 100
+    depth = 50
+    height = 200
+    hole_radius = 2  # Deliğin çapı
+    
+    # Lamello deliklerini çiz
+    for i in range(3):
+        ax.scatter(i * 30, depth / 2, height / 2, color='red', s=100)  # Deliğin pozisyonları
+    
+    ax.set_xlabel('Width')
+    ax.set_ylabel('Depth')
+    ax.set_zlabel('Height')
+    ax.set_title('Lamello Delik Pozisyonları')
+    st.pyplot(fig)
+
+# Raf Pozisyonları ve Rafların 3D Görselleştirmesi
+def shelf_visualization(project):
+    st.subheader("Raf Pozisyonları ve Rafların 3D Görselleştirmesi")
+    
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    
+    width = 100
+    depth = 50
+    height = 200
+    shelf_count = project["Panel Sayısı"] // 2  # Raf sayısı
+    shelf_height = height / (shelf_count + 1)
+    
+    # Rafları çiz
+    for i in range(shelf_count):
+        shelf_z = (i + 1) * shelf_height
+        ax.bar3d(0, 0, shelf_z, width, depth, 5, color='brown', alpha=0.8)
+    
+    ax.set_xlabel('Width')
+    ax.set_ylabel('Depth')
+    ax.set_zlabel('Height')
+    ax.set_title('Raf Pozisyonları ve Görselleştirmesi')
+    st.pyplot(fig)
+
+# PDF Teklif Şablonu Tasarımı
+def generate_pdf(project):
+    st.subheader("PDF Teklif Şablonu Oluşturma")
+    
+    pdf = FPDF()
+    pdf.add_page()
+    
+    # Başlık ve proje bilgileri
+    pdf.set_font("Arial", 'B', 16)
+    pdf.cell(200, 10, f"Teklif: {project['Proje Adı']}", ln=True)
+    
+    pdf.set_font("Arial", '', 12)
+    pdf.cell(200, 10, f"Panel Sayısı: {project['Panel Sayısı']}", ln=True)
+    pdf.cell(200, 10, f"Kapak Sayısı: {project['Kapak Sayısı']}", ln=True)
+    pdf.cell(200, 10, f"Toplam Maliyet: {project['Toplam Maliyet']} TL", ln=True)
+    
+    # PDF'yi kaydet
+    pdf_output = f"Teklif_{project['Proje Adı']}.pdf"
+    pdf.output(pdf_output)
+    st.write(f"Teklif PDF dosyası kaydedildi: {pdf_output}")
+
+# Rafları Otomatik Yerleştirme ve Pozisyon Ayarı
+def auto_place_shelves(project):
+    st.subheader("Rafları Otomatik Yerleştirme ve Pozisyon Ayarı")
+    
+    shelf_count = project["Panel Sayısı"] // 2
+    st.write(f"Raf sayısı: {shelf_count}")
+    
+    # Otomatik raf yerleştirme algoritması
+    shelf_positions = [i * (200 / (shelf_count + 1)) for i in range(shelf_count)]
+    st.write("Rafların pozisyonları: ", shelf_positions)
+
+# Ana kullanıcı arayüzü
 def main_ui(projects):
-    st.title("Dolap Üretim Programı")
-
-    selected_project_id = st.selectbox("Proje Seçin", [project["Proje Adı"] for project in projects])
-    selected_project = next(project for project in projects if project["Proje Adı"] == selected_project_id)
-
-    # Proje Güncellemeleri
-    st.subheader(f"{selected_project['Proje Adı']} Proje Detayları")
-    display_cabinet(selected_project)
-    calculate_panels(selected_project)
-    hardware_list(selected_project)
-    create_dxf(selected_project)
-    archive_project(selected_project)
+    st.title("Dolap Tasarımı ve Üretim Programı")
+    project_id = st.selectbox("Proje Seçin", [p["Proje Adı"] for p in projects])
+    project = next(p for p in projects if p["Proje Adı"] == project_id)
+    
+    # Panel Hesaplama
+    calculate_panels(project)
+    
+    # Donanım Listesi ve Maliyet Hesaplama
+    hardware_list(project)
+    
+    # DXF Çizimi
+    create_dxf(project)
+    
+    # Proje Arşivleme
+    archive_project(project)
+    
+    # 3D Görselleştirme
+    display_cabinet(project)
+    
+    # Kapak Çizimi ve Görünüm
+    door_visualization(project)
+    
+    # Lamello Delik Görselleştirme
+    lamello_hole_visualization(project)
+    
+    # Raf Görselleştirme
+    shelf_visualization(project)
+    
+    # PDF Teklif Oluşturma
+    generate_pdf(project)
+    
+    # Rafları Otomatik Yerleştirme
+    auto_place_shelves(project)
 
 if __name__ == "__main__":
     main_ui(projects)
