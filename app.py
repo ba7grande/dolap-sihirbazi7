@@ -93,10 +93,13 @@ if st.button("📁 DXF + Nesting + CSV Üret"):
         if y + h > plaka_h:
             continue
         for e in panel_msp:
-try:
-    e_copy = e.copy()
-    e_copy.translate(dx=x, dy=y)
-    msp.add_entity(e_copy)
+    try:
+        e_copy = e.copy()
+        e_copy.translate(dx=x, dy=y)
+        msp.add_entity(e_copy)
+    except Exception as err:
+        st.warning(f"Çizim elemanı atlandı: {e.dxftype()} ({str(err)})")
+
 except Exception as err:
     st.warning(f"Çizim elemanı atlandı: {e.dxftype()} ({str(err)})")
             
