@@ -1,4 +1,29 @@
-# Proje Düzenleme ve Güncelleme
+import streamlit as st
+import pandas as pd
+from datetime import datetime
+
+# Proje Verisi - Örnek olarak veri eklenmiştir
+projects = [
+    {"ID": 1, "Proje Adı": "Dolap 1", "Durum": "Devam Ediyor", "Başlangıç Tarihi": "2025-04-01", "Bitiş Tarihi": "2025-04-10", "Panel Sayısı": 12, "Kapak Sayısı": 4, "Toplam Maliyet": 5000, "İlerleme": 60},
+    {"ID": 2, "Proje Adı": "Dolap 2", "Durum": "Tamamlandı", "Başlangıç Tarihi": "2025-03-01", "Bitiş Tarihi": "2025-03-15", "Panel Sayısı": 8, "Kapak Sayısı": 2, "Toplam Maliyet": 3000, "İlerleme": 100},
+    {"ID": 3, "Proje Adı": "Dolap 3", "Durum": "Devam Ediyor", "Başlangıç Tarihi": "2025-04-05", "Bitiş Tarihi": "2025-04-12", "Panel Sayısı": 15, "Kapak Sayısı": 5, "Toplam Maliyet": 7000, "İlerleme": 80},
+]
+
+# Kullanıcı Rol Yönetimi
+def user_role_management():
+    st.sidebar.title("Kullanıcı ve Rol Yönetimi")
+    role = st.sidebar.selectbox("Kullanıcı Rolü", ["Yönetici", "Proje Yöneticisi", "Kullanıcı"])
+    if role == "Yönetici":
+        st.sidebar.subheader("Yönetici Paneli")
+        st.sidebar.text("Yönetici olarak projeleri düzenleyebilir ve raporları görüntüleyebilirsiniz.")
+    elif role == "Proje Yöneticisi":
+        st.sidebar.subheader("Proje Yöneticisi Paneli")
+        st.sidebar.text("Proje yöneticisi olarak projelere dair ilerleme güncellemeleri yapabilirsiniz.")
+    else:
+        st.sidebar.subheader("Kullanıcı Paneli")
+        st.sidebar.text("Kullanıcı olarak yalnızca mevcut projeleri görüntüleyebilirsiniz.")
+
+# Proje Güncelleme
 def update_project(project_id, projects):
     project = next((item for item in projects if item["ID"] == project_id), None)
     if project:
@@ -19,7 +44,7 @@ def update_project(project_id, projects):
         st.error(f"Proje ID {project_id} bulunamadı.")
         return None
 
-# Projelerin Düzenli Aralıklarla Yenilenmesi (Proje ilerlemesi)
+# Proje İlerleme Güncelleme
 def update_progress(project_id, projects):
     project = next((item for item in projects if item["ID"] == project_id), None)
     if project:
@@ -32,45 +57,22 @@ def update_progress(project_id, projects):
         st.error(f"Proje ID {project_id} bulunamadı.")
         return None
 
-# Kullanıcı ve Yetki Yönetimi
-def user_role_management():
-    st.sidebar.title("Kullanıcı ve Rol Yönetimi")
-    role = st.sidebar.selectbox("Kullanıcı Rolü", ["Yönetici", "Proje Yöneticisi", "Kullanıcı"])
-    if role == "Yönetici":
-        st.sidebar.subheader("Yönetici Paneli")
-        st.sidebar.text("Yönetici olarak projeleri düzenleyebilir ve raporları görüntüleyebilirsiniz.")
-    elif role == "Proje Yöneticisi":
-        st.sidebar.subheader("Proje Yöneticisi Paneli")
-        st.sidebar.text("Proje yöneticisi olarak projelere dair ilerleme güncellemeleri yapabilirsiniz.")
-    else:
-        st.sidebar.subheader("Kullanıcı Paneli")
-        st.sidebar.text("Kullanıcı olarak yalnızca mevcut projeleri görüntüleyebilirsiniz.")
-
-# Tüm Proje Detaylarını Görüntüleme
+# Tüm Projeleri Görüntüleme
 def view_all_projects(projects):
     st.subheader("Tüm Projeleri Görüntüle")
     df = pd.DataFrame(projects)
     st.write(df)
 
-# Proje Güncellemeleri ve Arşivleme
-def manage_project_updates(project_id, projects):
-    st.subheader("Proje Güncellemeleri ve Arşivleme")
-    
-    # Proje güncellenebilir
-    updated_project = update_project(project_id, projects)
-    
-    # Proje ilerlemesi güncellenebilir
-    updated_project = update_progress(project_id, projects)
-    
-    # Arşivleme yapılabilir
-    if st.button(f"Proje {project_id} Arşivle"):
-        archive_project(project_id, projects)
-    
-    # Güncellenmiş projeyi görüntüleyelim
-    if updated_project:
-        st.write(f"Güncellenmiş Proje: {updated_project}")
+# Proje Arşivleme
+def archive_project(project_id, projects):
+    project = next((item for item in projects if item["ID"] == project_id), None)
+    if project:
+        project["Durum"] = "Arşivlendi"
+        st.success(f"Proje {project_id} başarıyla arşivlendi.")
+    else:
+        st.error(f"Proje ID {project_id} bulunamadı.")
 
-# 3D Tasarım ve Üretim Adımları
+# 3D Görselleştirme ve Üretim Adımları
 def manufacturing_steps():
     st.subheader("Üretim Adımları ve 3D Görselleştirme")
     st.write("Burada üretim adımları görselleştirilecektir.")
@@ -91,11 +93,19 @@ def main_ui(projects):
     # Proje Güncelleme ve Arşivleme
     project_id_to_update = st.number_input("Güncellemek veya Arşivlemek için Proje ID girin", min_value=1)
     if project_id_to_update:
-        manage_project_updates(project_id_to_update, projects)
+        updated_project = update_project(project_id_to_update, projects)
+        updated_project = update_progress(project_id_to_update, projects)
     
+        if st.button(f"Proje {project_id_to_update} Arşivle"):
+            archive_project(project_id_to_update, projects)
+    
+        # Güncellenmiş projeyi görüntüleyelim
+        if updated_project:
+            st.write(f"Güncellenmiş Proje: {updated_project}")
+
     # Üretim Adımları
     manufacturing_steps()
 
-# Tamamlanan Kod
+# Ana program çalıştırma
 if __name__ == "__main__":
     main_ui(projects)
