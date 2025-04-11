@@ -1,4 +1,5 @@
 streamlit
-ezdxf
-pandas
 plotly
+numpy
+pandas
+matplotlib
