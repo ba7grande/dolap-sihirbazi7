@@ -7,3 +7,5 @@ ezdxf
 fpdf
 qrcode[pil]
 fpdf2
+qrcode[pil]
+
