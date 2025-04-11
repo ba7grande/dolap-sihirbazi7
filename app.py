@@ -2,11 +2,11 @@ import streamlit as st
 from fpdf import FPDF
 import numpy as np
 import matplotlib.pyplot as plt
+import ezdxf
 import os
 
 # Panel Hesaplama Modülü
 def calculate_panels(project):
-    # Panel hesaplamaları
     panel_area = project['Panel Boyutları']['Uzunluk'] * project['Panel Boyutları']['Genişlik']
     total_area = panel_area * project['Panel Sayısı']
     st.write(f"Toplam Panel Alanı: {total_area} cm²")
@@ -14,7 +14,6 @@ def calculate_panels(project):
 
 # Donanım Listesi ve Maliyet Hesaplama
 def hardware_list(project):
-    # Donanım hesaplamaları
     donanım_fiyatları = {"Ray": 100, "Vida": 50, "Lamello": 200}
     toplam_maliyet = (donanım_fiyatları["Ray"] * project['Kapak Sayısı']) + \
                      (donanım_fiyatları["Vida"] * project['Panel Sayısı']) + \
@@ -26,14 +25,25 @@ def hardware_list(project):
 
 # DXF Çizimi
 def create_dxf(project):
-    st.write("DXF Çizimi oluşturuluyor")
-    # Burada basit bir DXF çizimi yapılabilir, aşağıda örnek bir çizim var
-    # Bu çizim için bir DXF kütüphanesi kullanılabilir, örneğin `ezdxf`
+    st.write("DXF Çizimi Oluşturuluyor")
+    doc = ezdxf.new()
+    msp = doc.modelspace()
+    # Basit bir panel çizimi
+    msp.add_line((0, 0), (project['Panel Boyutları']['Uzunluk'], 0))
+    msp.add_line((project['Panel Boyutları']['Uzunluk'], 0), 
+                 (project['Panel Boyutları']['Uzunluk'], project['Panel Boyutları']['Genişlik']))
+    msp.add_line((project['Panel Boyutları']['Uzunluk'], project['Panel Boyutları']['Genişlik']), 
+                 (0, project['Panel Boyutları']['Genişlik']))
+    msp.add_line((0, project['Panel Boyutları']['Genişlik']), (0, 0))
+    
+    # DXF dosyasını kaydetme
+    dxf_file = f"panel_{project['Proje Adı']}.dxf"
+    doc.saveas(dxf_file)
+    st.write(f"DXF Dosyası: {dxf_file}")
 
 # 3D Görselleştirme Modülü
 def display_cabinet(project):
     st.write("3D Görselleştirme")
-    # Burada, dolabın 3D görselleştirilmesi için basit bir 3D modelleme yapılabilir
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
     ax.scatter(0, 0, 0, color='r', label="Dolap Başlangıcı")
@@ -45,7 +55,6 @@ def display_cabinet(project):
 # Kapak Çizimi ve Görünüm
 def door_visualization(project):
     st.write("Kapak Çizimi ve Açılır/Kapalı Görünüm")
-    # Kapak çizimini ve görünümünü oluşturuyoruz (2D veya 3D)
     fig, ax = plt.subplots()
     ax.plot([0, 1], [0, 0], label="Kapak")
     ax.set_title("Kapak Çizimi")
@@ -55,7 +64,6 @@ def door_visualization(project):
 # Lamello Delik Görselleştirme
 def lamello_hole_visualization(project):
     st.write("Lamello Deliği Görselleştirmesi")
-    # Lamello deliklerinin 3D görselleştirilmesi yapılabilir
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
     ax.scatter(1, 1, 1, color='g', label="Lamello Deliği")
@@ -67,7 +75,6 @@ def lamello_hole_visualization(project):
 # Raf Görselleştirme
 def shelf_visualization(project):
     st.write("Raf Pozisyonları ve Raf Görselleştirmesi")
-    # Raf yerleşimi ve görselleştirilmesi yapılabilir
     fig, ax = plt.subplots()
     ax.barh([1, 2, 3], [10, 20, 15])
     ax.set_xlabel("Raf Yükseklikleri")
@@ -95,8 +102,11 @@ def generate_pdf(project):
 # Rafları Otomatik Yerleştirme
 def auto_place_shelves(project):
     st.write("Rafları Otomatik Yerleştiriliyor")
-    # Raf yerleşim algoritması eklenebilir
-    # Basit bir örnek: rafların sırasını belirlemek
+    fig, ax = plt.subplots()
+    ax.plot([0, 1], [1, 1], label="Raf Pozisyonu")
+    ax.set_title("Raf Yerleşimi")
+    ax.legend()
+    st.pyplot(fig)
 
 # Ana Arayüz
 def main_ui(projects):
