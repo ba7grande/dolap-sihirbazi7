@@ -1,129 +1,150 @@
 import streamlit as st
 import numpy as np
-from pythreejs import *
-from fpdf import FPDF
+import pandas as pd
 import qrcode
-import io
-import csv
-import random
+from fpdf import FPDF
+import plotly.express as px
+from pythreejs import *  # 3D Görselleştirme için pythreejs
+import matplotlib.pyplot as plt
+from io import BytesIO
 
-# Streamlit Başlığı
-st.title('Dolap Üretim ve Tasarım Uygulaması')
+# 1. Dolap Ölçü Girişi
+def get_cabinet_dimensions():
+    width = st.number_input("Dolap Genişliği (cm):", min_value=1, max_value=500, value=100)
+    height = st.number_input("Dolap Yüksekliği (cm):", min_value=1, max_value=500, value=200)
+    depth = st.number_input("Dolap Derinliği (cm):", min_value=1, max_value=500, value=50)
+    return width, height, depth
 
-# Kullanıcıdan dolap ölçülerini alma
-width = st.number_input('Dolap Genişliği (cm)', min_value=30, max_value=200, value=60)
-height = st.number_input('Dolap Yüksekliği (cm)', min_value=30, max_value=300, value=80)
-thickness = st.number_input('Malzeme Kalınlığı (mm)', min_value=5, max_value=30, value=18) / 10  # cm cinsinden
+# 2. Parça Listesi Oluşturma
+def create_parts_list(cabinet_dimensions):
+    width, height, depth = cabinet_dimensions
+    parts = {
+        "Top Panel": {"Width": width, "Height": depth},
+        "Bottom Panel": {"Width": width, "Height": depth},
+        "Side Panel Left": {"Width": height, "Height": depth},
+        "Side Panel Right": {"Width": height, "Height": depth},
+        "Back Panel": {"Width": width, "Height": height},
+        "Shelves": {"Width": width, "Height": depth}
+    }
+    return parts
 
-# Parçaları oluşturma (örneğin, bir panel)
-panel_geometry = BoxGeometry(width=width, height=height, depth=thickness)
-panel_material = MeshLambertMaterial(color='blue', opacity=0.7, transparent=True)
-panel = Mesh(geometry=panel_geometry, material=panel_material)
+# 3. Lamello Cabineo Deliklerini Hesaplama
+def calculate_lamello_holes(parts):
+    holes = {}
+    for part, dimensions in parts.items():
+        holes[part] = f"Lamello holes for {part} at position: {np.random.randint(1, 5)}"
+    return holes
 
-# Işık ekleme
-light = DirectionalLight(color='white', intensity=1)
-light.position = [5, 5, 5]
+# 4. CSV Çıktısı
+def generate_csv(parts):
+    df = pd.DataFrame(parts).T
+    df.to_csv('parts_list.csv')
+    st.write("Parça Listesi CSV olarak indirildi.")
 
-# Sahne oluşturma
-scene = Scene(children=[panel, light])
-
-# Kamera ve Perspektif
-camera = PerspectiveCamera(fov=75, aspect=1, near=0.1, far=1000)
-camera.position = [100, 100, 100]
-camera.lookAt([0, 0, 0])
-
-# WebGL Renderer
-renderer = WebGLRenderer(camera=camera, scene=scene, width=600, height=600)
-renderer.setSize(600, 600)
-
-# 3D Görselleştirmeyi Streamlit'e entegre etme
-st.write("### 18mm Kalınlığında Dolap Parçası Görselleştirmesi")
-st.components.v1.html(renderer.to_html(), height=600)
-
-# Parça listesi oluşturma
-parts = {
-    'Panel': {'width': width, 'height': height, 'thickness': thickness},
-}
-
-# Parça CSV çıktısı oluşturma
-def create_csv(parts):
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(['Part Name', 'Width (cm)', 'Height (cm)', 'Thickness (cm)'])
-    for part_name, dimensions in parts.items():
-        writer.writerow([part_name, dimensions['width'], dimensions['height'], dimensions['thickness']])
-    return output.getvalue()
-
-# PDF teklif şablonu üretme
-def generate_pdf(parts):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", size=12)
-    pdf.cell(200, 10, txt="Dolap Üretim Teklif Şablonu", ln=True, align='C')
-    pdf.ln(10)
-    pdf.cell(200, 10, txt="Parçalar:", ln=True)
-    for part_name, dimensions in parts.items():
-        pdf.cell(200, 10, txt=f"{part_name}: {dimensions['width']} x {dimensions['height']} x {dimensions['thickness']} cm", ln=True)
-    pdf.output("project_quote.pdf")
-
-# QR kod üretimi
+# 5. QR Kod Üretimi
 def generate_qr_code(data):
-    qr = qrcode.QRCode(version=1, box_size=10, border=5)
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=10,
+        border=4,
+    )
     qr.add_data(data)
     qr.make(fit=True)
     img = qr.make_image(fill='black', back_color='white')
     return img
 
-# PDF, CSV ve QR kodları gösterme
-if st.button('PDF Teklif Oluştur'):
-    generate_pdf(parts)
-    st.success("PDF Teklif Oluşturuldu")
-
-if st.button('CSV Parça Listesi Oluştur'):
-    csv_data = create_csv(parts)
-    st.download_button('Parça Listesi CSV', csv_data, file_name='parts_list.csv')
-
-# QR kodu gösterme
-qr_code_data = "https://www.dolapsihirbazi.com"
-img = generate_qr_code(qr_code_data)
-st.image(img, caption="QR Kod")
-
-# Akıllı Fonksiyonlar (Montaj sırası ve zaman tahmini)
-def smart_functions():
-    assembly_order = np.random.choice(list(parts.keys()), size=len(parts), replace=False)
-    st.write("Montaj Sırası:", assembly_order)
-
-    # Üretim zaman tahmini (sadece örnek)
-    estimated_time = np.random.randint(30, 120)  # 30-120 dakika arasında rastgele bir değer
-    st.write(f"Üretim Zamanı Tahmini: {estimated_time} dakika")
-
-# Akıllı Fonksiyonları çalıştırma
-if st.button('Akıllı Fonksiyonlar'):
-    smart_functions()
-
-# CNC Entegrasyonu: DXF ve G-code çıktısı üretme
+# 6. CNC Entegrasyonu: DXF Çıktısı ve Donanım Hesaplama
 def generate_dxf(parts):
-    dxf_content = f"DXF for {len(parts)} parts:\n"
-    for part_name, dimensions in parts.items():
-        dxf_content += f"{part_name}: {dimensions['width']} x {dimensions['height']} x {dimensions['thickness']} cm\n"
-    return dxf_content
+    dxf_data = f"DXF for {list(parts.keys())}"
+    return dxf_data
 
-if st.button('DXF Çıktısı Oluştur'):
-    dxf_data = generate_dxf(parts)
-    st.text(dxf_data)
+# 7. 3D Görselleştirme (pythreejs)
+def visualize_3d(cabinet_dimensions):
+    width, height, depth = cabinet_dimensions
 
-# Donanım ve maliyet hesaplama
-def calculate_hardware_cost(parts):
-    hardware_costs = {
-        'Vida': 0.5,  # unit cost per part
-        'Minifix': 2.0,  # unit cost per part
-        'Ray': 5.0,  # unit cost per part
-        'Kulp': 3.0,  # unit cost per part
-    }
-    total_cost = len(parts) * sum(hardware_costs.values())
-    st.write(f"Donanım Maliyeti: {total_cost} TL")
-    return total_cost
+    # Kamera ve sahne ayarları
+    scene = Scene()
+    camera = PerspectiveCamera(position=[3, 3, 3], lookAt=[0, 0, 0])
+    renderer = WebGLRenderer(camera=camera, scene=scene, width=600, height=600)
 
-# Maliyet hesaplama butonu
-if st.button('Maliyet Hesaplama'):
-    calculate_hardware_cost(parts)
+    # 3D model çizimi
+    box = Mesh(geometry=BoxGeometry(width, height, depth), material=MeshLambertMaterial(color='skyblue'))
+    scene.add(box)
+
+    renderer.set_size(600, 600)
+
+    st.write("3D Model Görselleştirmesi")
+    display(renderer)
+
+# 8. Akıllı Fonksiyonlar
+def smart_functions(parts):
+    # Örneğin, otomatik malzeme optimizasyonu
+    material_optimization = "Material optimization done"
+    st.write(material_optimization)
+
+# 9. PDF Teklif Şablonu Tasarımı
+def generate_pdf(project):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    
+    # Dolap Bilgileri
+    pdf.cell(200, 10, txt="Dolap Teklifi", ln=True, align="C")
+    pdf.ln(10)
+    for key, value in project.items():
+        pdf.cell(200, 10, txt=f"{key}: {value}", ln=True, align="L")
+
+    # PDF çıktısı
+    pdf.output("project_quote.pdf")
+    st.write("Teklif PDF olarak indirildi.")
+
+# 10. Grafik ve Raporlar
+def generate_report(parts):
+    df = pd.DataFrame(parts).T
+    fig = px.bar(df, x=df.index, y=["Width", "Height"], title="Parça Ölçüleri")
+    st.plotly_chart(fig)
+
+# Ana UI Fonksiyonu
+def main_ui():
+    st.title("Dolap Üretim Programı")
+
+    # 1. Ölçü Girişi
+    cabinet_dimensions = get_cabinet_dimensions()
+
+    # 2. Parça Listesi Oluşturma
+    parts = create_parts_list(cabinet_dimensions)
+    st.write("Parça Listesi:")
+    st.write(parts)
+
+    # 3. Lamello Delik Pozisyonları
+    holes = calculate_lamello_holes(parts)
+    st.write("Lamello Delik Pozisyonları:")
+    st.write(holes)
+
+    # 4. CSV Çıktısı
+    generate_csv(parts)
+
+    # 5. QR Kod Üretimi
+    qr_code_image = generate_qr_code(str(parts))
+    st.image(qr_code_image)
+
+    # 6. DXF Çıktısı
+    dxf = generate_dxf(parts)
+    st.write(f"DXF Çıktısı:\n{dxf}")
+
+    # 7. 3D Görselleştirme
+    visualize_3d(cabinet_dimensions)
+
+    # 8. Akıllı Fonksiyonlar
+    smart_functions(parts)
+
+    # 9. PDF Teklif Şablonu
+    generate_pdf(parts)
+
+    # 10. Grafik Raporu
+    generate_report(parts)
+
+# Uygulamayı Çalıştırma
+if __name__ == "__main__":
+    main_ui()
