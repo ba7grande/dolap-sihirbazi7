@@ -1,11 +1,6 @@
 streamlit
 plotly
-numpy
-pandas
-matplotlib
-ezdxf
-fpdf
-qrcode[pil]
 fpdf2
 qrcode[pil]
-
+numpy
+pythreejs
