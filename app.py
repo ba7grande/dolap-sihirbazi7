@@ -19,7 +19,50 @@ cabineo_yon = st.sidebar.selectbox("Cabineo Delik Yönü", ["Üst", "Alt", "Sağ
 st.sidebar.header("📐 Dolap Bölmeleri")
 bolme_sayisi = st.sidebar.number_input("Bölme Sayısı", min_value=1, max_value=10, value=1)
 
+# DXF fonksiyonları
+
+def dxf_add_mentese(msp, x, y):
+    msp.add_circle(center=(x, y), radius=17.5)
+
+def dxf_add_cabineo(msp, x, y):
+    msp.add_circle(center=(x, y), radius=6)
+    msp.add_lwpolyline([(x-7, y-7), (x+7, y-7), (x+7, y+7), (x-7, y+7)], close=True)
+
+# 3D çizim için mesh fonksiyonları
+
+fig = go.Figure()
+
+def add_mentese(x, y, z):
+    theta = np.linspace(0, 2 * np.pi, 16)
+    r = 17.5
+    cx = r * np.cos(theta)
+    cy = r * np.sin(theta)
+    x_vals, y_vals, z_vals = [], [], []
+    for dz in [0, 12]:
+        x_vals.extend(x + cx)
+        y_vals.extend(y + cy)
+        z_vals.extend([z + dz] * len(cx))
+    fig.add_trace(go.Mesh3d(x=x_vals, y=y_vals, z=z_vals, opacity=1.0, color='blue', name='Menteşe'))
+
+def add_cabineo(x, y, z):
+    theta = np.linspace(0, 2 * np.pi, 16)
+    cx = 6 * np.cos(theta)
+    cy = 6 * np.sin(theta)
+    x_vals, y_vals, z_vals = [], [], []
+    for dz in [0, 10]:
+        x_vals.extend(x + cx)
+        y_vals.extend(y + cy)
+        z_vals.extend([z + dz] * len(cx))
+    fig.add_trace(go.Mesh3d(x=x_vals, y=y_vals, z=z_vals, opacity=1.0, color='black', name='Cabineo'))
+    hw = 7
+    fig.add_trace(go.Mesh3d(x=[x - hw, x + hw, x + hw, x - hw], y=[y - hw, y - hw, y + hw, y + hw], z=[z + 11] * 4, i=[0], j=[1], k=[2], color='gray', name='Cabineo Başlık', opacity=1.0))
+
+# Panel üretimi ve çizim
+
 bolmeler = []
+if not os.path.exists("paneller"):
+    os.makedirs("paneller")
+
 for i in range(bolme_sayisi):
     st.subheader(f"📦 Bölme {i+1} Yapılandırması")
     gen = st.number_input(f"Bölme {i+1} Genişlik (mm)", value=600, key=f"gen{i}")
@@ -27,81 +70,38 @@ for i in range(bolme_sayisi):
     der = st.number_input(f"Bölme {i+1} Derinlik (mm)", value=500, key=f"der{i}")
     kapak_sayisi = st.number_input(f"Kapak Sayısı", min_value=0, value=1, key=f"kapak{i}")
     cekmece_sayisi = st.number_input(f"Çekmece Sayısı", min_value=0, value=0, key=f"cekmece{i}")
-    bolmeler.append({
-        "gen": gen, "yuk": yuk, "der": der,
-        "kapak": kapak_sayisi,
-        "cekmece": cekmece_sayisi
-    })
 
-fig = go.Figure()
-z_offset = 0
-kesim_listesi = []
+    panel_dxf = ezdxf.new()
+    msp = panel_dxf.modelspace()
+    msp.add_lwpolyline([(0, 0), (gen, 0), (gen, yuk), (0, yuk)], close=True)
 
-if not os.path.exists("paneller"):
-    os.makedirs("paneller")
-if not os.path.exists("nesting"):
-    os.makedirs("nesting")
-if not os.path.exists("etiketler"):
-    os.makedirs("etiketler")
+    # Delikler DXF'e
+    dxf_add_cabineo(msp, 37, yuk / 2)
+    dxf_add_cabineo(msp, gen - 37, yuk / 2)
+    dxf_add_cabineo(msp, gen / 2, 37)
+    dxf_add_cabineo(msp, gen / 2, yuk - 37)
 
-for i, b in enumerate(bolmeler):
-    for j in range(2):
-        kesim_listesi.append({"Parça": f"Yan Panel {j+1} Bölme {i+1}", "Genişlik": b["yuk"], "Yükseklik": b["der"], "Kalınlık": kalinlik})
-    for k in range(b["kapak"]):
-        kesim_listesi.append({"Parça": f"Kapak {k+1} Bölme {i+1}", "Genişlik": b["gen"], "Yükseklik": b["yuk"], "Kalınlık": kalinlik})
-    for c in range(b["cekmece"]):
-        yuk_parca = b["yuk"] // (b["cekmece"] or 1)
-        kesim_listesi.append({"Parça": f"Çekmece {c+1} Bölme {i+1}", "Genişlik": b["gen"], "Yükseklik": yuk_parca, "Kalınlık": kalinlik})
-    z_offset += b["gen"] + 50
+    aralik = yuk / (menteşe_adedi + 1) if menteşe_adedi > 0 else 0
+    for m in range(menteşe_adedi):
+        y_merkez = (m + 1) * aralik
+        dxf_add_mentese(msp, 5 + 17.5, y_merkez)
+        dxf_add_mentese(msp, gen - 5 - 17.5, y_merkez)
+
+    panel_path = f"paneller/bolme_{i+1}.dxf"
+    panel_dxf.saveas(panel_path)
+
+    # 3D Görünüm için delikler
+    add_cabineo(37, yuk / 2, der)
+    add_cabineo(gen - 37, yuk / 2, der)
+    add_cabineo(gen / 2, 37, der)
+    add_cabineo(gen / 2, yuk - 37, der)
+    for m in range(menteşe_adedi):
+        y_merkez = (m + 1) * aralik
+        add_mentese(5 + 17.5, y_merkez, der)
+        add_mentese(gen - 5 - 17.5, y_merkez, der)
+
+    bolmeler.append({"gen": gen, "yuk": yuk, "der": der, "kapak": kapak_sayisi, "cekmece": cekmece_sayisi})
 
 fig.update_layout(scene=dict(xaxis_title='X', yaxis_title='Y', zaxis_title='Z'), margin=dict(l=0, r=0, b=0, t=0))
-st.subheader("🧱 3D Katı Model ve Bölme Görünümü")
+st.subheader("🧱 3D Katı Model ve Bağlantı Önizleme")
 st.plotly_chart(fig, use_container_width=True)
-
-st.subheader("📋 Kesim Listesi")
-df = pd.DataFrame(kesim_listesi)
-st.dataframe(df)
-csv_buffer = df.to_csv(index=False).encode()
-st.download_button("📥 Kesim Listesini İndir (CSV)", data=csv_buffer, file_name="kesim_listesi.csv", mime="text/csv")
-
-# 🔄 Nesting DXF
-st.subheader("🧩 Nesting Planı (DXF)")
-plaka_w, plaka_h = 2100, 2800
-x, y, max_y = 0, 0, 0
-nesting_dxf = ezdxf.new()
-nesting_msp = nesting_dxf.modelspace()
-
-for i, row in df.iterrows():
-    w, h = row["Genişlik"], row["Yükseklik"]
-    if x + w > plaka_w:
-        x = 0
-        y += max_y + 10
-        max_y = 0
-    if y + h > plaka_h:
-        continue
-    nesting_msp.add_lwpolyline([(x, y), (x + w, y), (x + w, y + h), (x, y + h)], close=True)
-    text = nesting_msp.add_text(row["Parça"], dxfattribs={"height": 10})
-    text.dxf.insert = (x + 10, y + 10)
-    x += w + 10
-    if h > max_y:
-        max_y = h
-
-nesting_path = "nesting/nesting_plan.dxf"
-nesting_dxf.saveas(nesting_path)
-st.download_button("📥 Nesting DXF Planını İndir", data=open(nesting_path, "rb"), file_name="nesting_plan.dxf")
-
-# 🖨️ Etiket PDF üretimi
-st.subheader("🏷️ PDF Etiket Üretimi")
-pdf = FPDF()
-pdf.set_auto_page_break(auto=True, margin=15)
-
-for row in df.itertuples():
-    pdf.add_page()
-    pdf.set_font("Arial", size=24)
-    pdf.cell(200, 20, txt=f"{row.Parça}", ln=True, align="C")
-    pdf.set_font("Arial", size=16)
-    pdf.cell(200, 10, txt=f"{row.Genişlik} x {row.Yükseklik} x {row.Kalınlık} mm", ln=True, align="C")
-
-etiket_path = "etiketler/etiketler.pdf"
-pdf.output(etiket_path)
-st.download_button("📥 PDF Etiketleri İndir", data=open(etiket_path, "rb"), file_name="etiketler.pdf")
