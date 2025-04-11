@@ -118,7 +118,8 @@ for i, row in df.iterrows():
     if y + h > plaka_h:
         continue
     nesting_msp.add_lwpolyline([(x, y), (x + w, y), (x + w, y + h), (x, y + h)], close=True)
-    nesting_msp.add_text(row["Parça"], dxfattribs={"height": 10}).set_pos((x + 10, y + 10))
+    text = nesting_msp.add_text(row["Parça"], dxfattribs={"height": 10})
+    text.dxf.insert = (x + 10, y + 10)
     x += w + 10
     if h > max_y:
         max_y = h
