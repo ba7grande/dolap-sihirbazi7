@@ -5,3 +5,4 @@ pandas
 matplotlib
 ezdxf
 fpdf
+pip install qrcode[pil]
