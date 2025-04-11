@@ -5,6 +5,7 @@ from fpdf import FPDF
 import qrcode
 import io
 import csv
+import random
 
 # Streamlit Başlığı
 st.title('Dolap Üretim ve Tasarım Uygulaması')
