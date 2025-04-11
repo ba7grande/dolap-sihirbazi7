@@ -1,135 +1,101 @@
-import streamlit as st
-import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-from datetime import datetime
-import numpy as np
-
-# Verilerin örnek olarak hazırlanması
-projects = [
-    {"ID": 1, "Proje Adı": "Dolap 1", "Durum": "Devam Ediyor", "Başlangıç Tarihi": "2025-04-01", "Bitiş Tarihi": "2025-04-10", "Panel Sayısı": 12, "Kapak Sayısı": 4, "Toplam Maliyet": 5000, "İlerleme": 60},
-    {"ID": 2, "Proje Adı": "Dolap 2", "Durum": "Tamamlandı", "Başlangıç Tarihi": "2025-03-01", "Bitiş Tarihi": "2025-03-15", "Panel Sayısı": 8, "Kapak Sayısı": 2, "Toplam Maliyet": 3000, "İlerleme": 100},
-    {"ID": 3, "Proje Adı": "Dolap 3", "Durum": "Devam Ediyor", "Başlangıç Tarihi": "2025-04-05", "Bitiş Tarihi": "2025-04-12", "Panel Sayısı": 15, "Kapak Sayısı": 5, "Toplam Maliyet": 7000, "İlerleme": 80},
-]
-
-# 3D Görselleştirme (örnekleme, burada basit bir görselleştirme olacak)
-def plot_3d_design():
-    st.subheader("3D Dolap Tasarımı")
-    st.write("3D görselleştirme burada olacak. [Burada bir görsel eklenebilir.]")
-
-# Zaman Çizelgesi - Gantt Şeması
-def plot_project_timeline(projects):
-    df = pd.DataFrame(projects, columns=["ID", "Proje Adı", "Durum", "Başlangıç Tarihi", "Bitiş Tarihi"])
-    plt.figure(figsize=(10, 6))
-    df['Başlangıç Tarihi'] = pd.to_datetime(df['Başlangıç Tarihi'])
-    df['Bitiş Tarihi'] = pd.to_datetime(df['Bitiş Tarihi'])
-    
-    for i, row in df.iterrows():
-        plt.barh(row['Proje Adı'], (row['Bitiş Tarihi'] - row['Başlangıç Tarihi']).days, left=row['Başlangıç Tarihi'])
-    
-    plt.title("Projelerin Zaman Çizelgesi")
-    plt.xlabel("Tarih")
-    plt.ylabel("Proje Adı")
-    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
-    plt.xticks(rotation=45)
-    st.pyplot()
-
-# İlerleme Çubukları
-def plot_progress_bar(projects):
-    df = pd.DataFrame(projects, columns=["ID", "Proje Adı", "Durum", "Başlangıç Tarihi", "Bitiş Tarihi", "İlerleme"])
-    for i, row in df.iterrows():
-        st.write(f"{row['Proje Adı']} - {row['Durum']}")
-        st.progress(row['İlerleme'] / 100)
-
-# Proje Detayları
-def project_details(project_id, projects):
+# Proje Düzenleme ve Güncelleme
+def update_project(project_id, projects):
     project = next((item for item in projects if item["ID"] == project_id), None)
     if project:
-        st.subheader(f"Proje Detayları - {project['Proje Adı']}")
-        st.write(f"Proje Adı: {project['Proje Adı']}")
-        st.write(f"Durum: {project['Durum']}")
-        st.write(f"Başlangıç Tarihi: {project['Başlangıç Tarihi']}")
-        st.write(f"Bitiş Tarihi: {project['Bitiş Tarihi']}")
-        st.write(f"Panel Sayısı: {project['Panel Sayısı']}")
-        st.write(f"Kapak Sayısı: {project['Kapak Sayısı']}")
-        st.write(f"Toplam Maliyet: {project['Toplam Maliyet']} ₺")
+        st.subheader(f"Proje {project_id} Güncelle")
+        new_name = st.text_input("Proje Adı", value=project["Proje Adı"])
+        new_status = st.selectbox("Proje Durumu", ["Devam Ediyor", "Tamamlandı", "Beklemede"], index=["Devam Ediyor", "Tamamlandı", "Beklemede"].index(project["Durum"]))
+        new_start_date = st.date_input("Başlangıç Tarihi", value=datetime.strptime(project["Başlangıç Tarihi"], "%Y-%m-%d"))
+        new_end_date = st.date_input("Bitiş Tarihi", value=datetime.strptime(project["Bitiş Tarihi"], "%Y-%m-%d"))
+        
+        if st.button(f"Proje {project_id} Güncelle"):
+            project["Proje Adı"] = new_name
+            project["Durum"] = new_status
+            project["Başlangıç Tarihi"] = new_start_date.strftime("%Y-%m-%d")
+            project["Bitiş Tarihi"] = new_end_date.strftime("%Y-%m-%d")
+            st.success(f"Proje {project_id} başarıyla güncellendi.")
+        return project
     else:
-        st.error("Proje bulunamadı.")
+        st.error(f"Proje ID {project_id} bulunamadı.")
+        return None
 
-# Özelleştirilmiş Raporlar
-def custom_report(projects, panel_threshold, cost_threshold):
-    filtered_projects = [p for p in projects if p['Panel Sayısı'] >= panel_threshold and p['Toplam Maliyet'] >= cost_threshold]
-    if filtered_projects:
-        st.subheader("Özelleştirilmiş Rapor - Panel ve Maliyet Filtreleme")
-        df = pd.DataFrame(filtered_projects, columns=["Proje Adı", "Durum", "Başlangıç Tarihi", "Bitiş Tarihi", "Panel Sayısı", "Kapak Sayısı", "Toplam Maliyet"])
-        st.write(df)
+# Projelerin Düzenli Aralıklarla Yenilenmesi (Proje ilerlemesi)
+def update_progress(project_id, projects):
+    project = next((item for item in projects if item["ID"] == project_id), None)
+    if project:
+        new_progress = st.slider("İlerleme (%)", min_value=0, max_value=100, value=project["İlerleme"], step=1)
+        if st.button(f"Proje {project_id} İlerleme Güncelle"):
+            project["İlerleme"] = new_progress
+            st.success(f"Proje {project_id} ilerlemesi başarıyla güncellendi.")
+        return project
     else:
-        st.warning("Filtrene göre proje bulunamadı.")
+        st.error(f"Proje ID {project_id} bulunamadı.")
+        return None
 
-# Performans İzleme (Kapanış Raporu)
-def performance_tracking(projects):
-    completed_projects = [p for p in projects if p['Durum'] == 'Tamamlandı']
-    if completed_projects:
-        st.subheader("Tamamlanan Projeler - Kapanış Raporu")
-        completed_project_data = []
-        for project in completed_projects:
-            start_date = datetime.strptime(project['Başlangıç Tarihi'], "%Y-%m-%d")
-            end_date = datetime.strptime(project['Bitiş Tarihi'], "%Y-%m-%d")
-            project_duration = (end_date - start_date).days
-            completed_project_data.append({
-                'Proje Adı': project['Proje Adı'],
-                'Başlangıç Tarihi': project['Başlangıç Tarihi'],
-                'Bitiş Tarihi': project['Bitiş Tarihi'],
-                'Proje Süresi (gün)': project_duration,
-                'Toplam Maliyet': project['Toplam Maliyet']
-            })
-        df = pd.DataFrame(completed_project_data)
-        st.write(df)
+# Kullanıcı ve Yetki Yönetimi
+def user_role_management():
+    st.sidebar.title("Kullanıcı ve Rol Yönetimi")
+    role = st.sidebar.selectbox("Kullanıcı Rolü", ["Yönetici", "Proje Yöneticisi", "Kullanıcı"])
+    if role == "Yönetici":
+        st.sidebar.subheader("Yönetici Paneli")
+        st.sidebar.text("Yönetici olarak projeleri düzenleyebilir ve raporları görüntüleyebilirsiniz.")
+    elif role == "Proje Yöneticisi":
+        st.sidebar.subheader("Proje Yöneticisi Paneli")
+        st.sidebar.text("Proje yöneticisi olarak projelere dair ilerleme güncellemeleri yapabilirsiniz.")
     else:
-        st.warning("Henüz tamamlanmış proje yok.")
+        st.sidebar.subheader("Kullanıcı Paneli")
+        st.sidebar.text("Kullanıcı olarak yalnızca mevcut projeleri görüntüleyebilirsiniz.")
 
-# Kullanıcı Yönetimi ve Giriş Yapma
-def user_management():
-    st.sidebar.title("Kullanıcı Girişi")
-    user_name = st.sidebar.text_input("Kullanıcı Adı")
-    password = st.sidebar.text_input("Parola", type='password')
+# Tüm Proje Detaylarını Görüntüleme
+def view_all_projects(projects):
+    st.subheader("Tüm Projeleri Görüntüle")
+    df = pd.DataFrame(projects)
+    st.write(df)
+
+# Proje Güncellemeleri ve Arşivleme
+def manage_project_updates(project_id, projects):
+    st.subheader("Proje Güncellemeleri ve Arşivleme")
     
-    if user_name and password:
-        # Gerçek giriş sistemleri için burada doğrulama yapılır
-        st.sidebar.success(f"Hoşgeldiniz, {user_name}")
-    else:
-        st.sidebar.warning("Giriş yapmak için kullanıcı adı ve parola girin.")
+    # Proje güncellenebilir
+    updated_project = update_project(project_id, projects)
+    
+    # Proje ilerlemesi güncellenebilir
+    updated_project = update_progress(project_id, projects)
+    
+    # Arşivleme yapılabilir
+    if st.button(f"Proje {project_id} Arşivle"):
+        archive_project(project_id, projects)
+    
+    # Güncellenmiş projeyi görüntüleyelim
+    if updated_project:
+        st.write(f"Güncellenmiş Proje: {updated_project}")
 
-# Ana Uygulama UI
-st.set_page_config(page_title="📋 Dolap Üretim Programı", layout="wide")
-st.title("📋 Dolap Üretim Programı")
+# 3D Tasarım ve Üretim Adımları
+def manufacturing_steps():
+    st.subheader("Üretim Adımları ve 3D Görselleştirme")
+    st.write("Burada üretim adımları görselleştirilecektir.")
+    st.write("Örnek olarak: Panel montajı, aksesuar yerleştirme ve montaj sonrası testler gibi.")
+    st.write("3D görselleştirmeler burada yer tutucu olarak eklenmiştir.")
+    
+# Ana Ekran ve Menü
+def main_ui(projects):
+    st.title("📋 Dolap Üretim Programı")
+    
+    # Kullanıcı ve Rol Yönetimi
+    user_role_management()
 
-# Kullanıcı Girişi
-user_management()
+    # Projeleri Görüntüleme
+    if st.button("Tüm Projeleri Görüntüle"):
+        view_all_projects(projects)
 
-# 3D Tasarım Görselleştirme
-plot_3d_design()
+    # Proje Güncelleme ve Arşivleme
+    project_id_to_update = st.number_input("Güncellemek veya Arşivlemek için Proje ID girin", min_value=1)
+    if project_id_to_update:
+        manage_project_updates(project_id_to_update, projects)
+    
+    # Üretim Adımları
+    manufacturing_steps()
 
-# Proje Zaman Çizelgesi
-st.subheader("Projelerin Zaman Çizelgesi")
-plot_project_timeline(projects)
-
-# Proje İlerleme
-st.subheader("Projelerin İlerleme Durumu")
-plot_progress_bar(projects)
-
-# Proje Detayları
-project_id = st.number_input("Proje ID'si girin", min_value=1, step=1)
-if project_id:
-    project_details(project_id, projects)
-
-# Özelleştirilmiş Raporlar
-st.subheader("Özelleştirilmiş Rapor - Panel ve Maliyet Filtreleme")
-panel_threshold = st.slider("Minimum Panel Sayısı", min_value=0, max_value=100, value=10, step=1)
-cost_threshold = st.slider("Minimum Toplam Maliyet (₺)", min_value=0, max_value=100000, value=5000, step=500)
-if st.button("Raporu Göster"):
-    custom_report(projects, panel_threshold, cost_threshold)
-
-# Performans İzleme
-if projects:
-    performance_tracking(projects)
+# Tamamlanan Kod
+if __name__ == "__main__":
+    main_ui(projects)
