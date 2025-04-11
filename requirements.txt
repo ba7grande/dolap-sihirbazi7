@@ -6,3 +6,4 @@ matplotlib
 ezdxf
 fpdf
 qrcode[pil]
+fpdf2
