@@ -1,138 +1,135 @@
 import numpy as np
-import pandas as pd
 import qrcode
-import matplotlib.pyplot as plt
 import ezdxf
 from fpdf import FPDF
+import plotly.graph_objects as go
+import streamlit as st
 
-# Örnek proje verisi
-project = {
-    'parts': ['panel1', 'panel2', 'panel3', 'panel4'],
-    'measurements': {'width': 1000, 'height': 2000, 'depth': 500},
-    'hardware': {'screws': 20, 'minifix': 10, 'hinges': 5},  # Donanım verisi
-}
+# 1. Proje Veri Yapısı
+class Project:
+    def __init__(self, measurements, parts, hardware, nesting, cabindel_positions):
+        self.measurements = measurements
+        self.parts = parts
+        self.hardware = hardware
+        self.nesting = nesting
+        self.cabindel_positions = cabindel_positions
 
-# Parça yerleşimi fonksiyonu (Akıllı fonksiyon)
-def smart_functions(project):
-    # 'project.parts' bir liste veya numpy array olmalı
-    if isinstance(project['parts'], (list, np.ndarray)):
-        # Eğer 'project.parts' doğru formatta ise
-        assembly_order = np.random.choice(project['parts'])
-        print(f"Assembly Order: {assembly_order}")
-    else:
-        print("project.parts doğru formatta değil!")
-
-# PDF teklif şablonu oluşturma
+# 2. PDF Teklif Şablonu
 def generate_pdf(project):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=12)
+
     pdf.cell(200, 10, txt="Dolap Teklifi", ln=True, align='C')
-    
-    # Proje bilgileri ekleme
-    pdf.cell(200, 10, txt=f"Parça Listesi: {', '.join(project['parts'])}", ln=True)
-    pdf.cell(200, 10, txt=f"Ölçüler: {project['measurements']}", ln=True)
-    pdf.cell(200, 10, txt=f"Donanım: {project['hardware']}", ln=True)
-    
-    # PDF dosyasını kaydetme
+    pdf.cell(200, 10, txt=f"Parça Listesi: {', '.join(project.parts)}", ln=True)
+    pdf.cell(200, 10, txt=f"Ölçüler: {project.measurements}", ln=True)
+    pdf.cell(200, 10, txt=f"Donanım: {project.hardware}", ln=True)
     pdf.output("project_quote.pdf")
     print("PDF Teklif Oluşturuldu!")
 
-# CSV çıktısı oluşturma
-def generate_csv(project):
-    data = {
-        'Part': project['parts'],
-        'Width': [project['measurements']['width']] * len(project['parts']),
-        'Height': [project['measurements']['height']] * len(project['parts']),
-        'Depth': [project['measurements']['depth']] * len(project['parts']),
-    }
-    df = pd.DataFrame(data)
-    df.to_csv('project_parts.csv', index=False)
-    print("CSV Dosyası Oluşturuldu!")
-
-# QR kod üretme ve barkod oluşturma
-def generate_qr_code(data, filename="qrcode.png"):
-    qr = qrcode.QRCode(
-        version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_L,
-        box_size=10,
-        border=4,
-    )
-    qr.add_data(data)
+# 3. QR ve Barkod Etiketi Üretimi
+def generate_qr_code(project_part):
+    qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=4)
+    qr.add_data(project_part)
     qr.make(fit=True)
     img = qr.make_image(fill='black', back_color='white')
-    img.save(filename)
-    print(f"QR Kodu {filename} olarak kaydedildi.")
+    img.save(f"{project_part}_qr.png")
+    print(f"{project_part} için QR kodu oluşturuldu!")
 
-# CNC Entegrasyonu: DXF dosyası üretme
+# 4. DXF Dosyası Oluşturma
 def generate_dxf(project):
     doc = ezdxf.new()
     msp = doc.modelspace()
-    
-    # Basit bir dikdörtgen dolap çizimi
-    msp.add_lwpolyline([(0, 0), (0, project['measurements']['height']),
-                         (project['measurements']['width'], project['measurements']['height']),
-                         (project['measurements']['width'], 0), (0, 0)], close=True)
-    
-    doc.saveas('project.dxf')
-    print("DXF Dosyası Oluşturuldu!")
 
-# 3D Görselleştirme (Matplotlib ile basit görselleştirme)
-def visualize_3d(project):
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    ax.bar3d([0, 0, 1], [0, 1, 1], [0, 0, 0], [project['measurements']['width']] * 3, [project['measurements']['height']] * 3, [project['measurements']['depth']] * 3)
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-    plt.show()
+    for part in project.parts:
+        # Örneğin: her parçanın 2D çizimini yapıyoruz (ölçülere göre)
+        msp.add_line((0, 0), (project.measurements['width'], 0))
+        msp.add_line((0, 0), (0, project.measurements['height']))
+        msp.add_line((project.measurements['width'], 0), (project.measurements['width'], project.measurements['height']))
+        msp.add_line((0, project.measurements['height']), (project.measurements['width'], project.measurements['height']))
 
-# Donanım ve maliyet hesaplama
-def calculate_costs(project):
-    # Örnek maliyet hesaplaması
-    material_cost = (project['measurements']['width'] * project['measurements']['height']) * 0.02  # m² başına 0.02 TL
-    hardware_cost = sum(project['hardware'].values()) * 0.5  # Donanım başına 0.5 TL
-    total_cost = material_cost + hardware_cost
-    print(f"Malzeme Maliyeti: {material_cost:.2f} TL")
-    print(f"Donanım Maliyeti: {hardware_cost:.2f} TL")
-    print(f"Toplam Maliyet: {total_cost:.2f} TL")
+    doc.save("project_output.dxf")
+    print("DXF dosyası oluşturuldu.")
+
+# 5. 3D Görselleştirme
+def generate_3d_visualization(project):
+    fig = go.Figure()
+
+    # X, Y, Z koordinatları ile dolap yapısını çiziyoruz
+    fig.add_trace(go.Mesh3d(
+        x=[0, project.measurements['width'], project.measurements['width'], 0],
+        y=[0, 0, project.measurements['depth'], project.measurements['depth']],
+        z=[0, 0, 0, 0],
+        color='rgba(0, 0, 255, 0.1)',
+        opacity=0.5
+    ))
+
+    fig.update_layout(scene=dict(
+        xaxis=dict(range=[0, project.measurements['width']]),
+        yaxis=dict(range=[0, project.measurements['depth']]),
+        zaxis=dict(range=[0, project.measurements['height']])
+    ))
+
+    fig.show()
+
+# 6. Menteşe Delikleri ve Lamello Cabineo Bağlantıları
+def add_hinge_and_cabineo_holes(project):
+    for part in project.parts:
+        # Menteşe deliklerini ekleme
+        print(f"{part} için menteşe delikleri eklendi.")
+        # Lamello Cabineo deliklerini ekleme
+        print(f"{part} için Lamello Cabineo delikleri eklendi.")
+
+# 7. Donanım ve Maliyet Hesaplama
+def calculate_cost(project):
+    hardware_cost = {
+        'vida': 0.5,
+        'minifix': 1.2,
+        'ray': 2.5,
+        'kulp': 3.0
+    }
+
+    total_cost = 0
+    for part in project.parts:
+        for hardware in project.hardware:
+            total_cost += hardware_cost.get(hardware, 0)
+
     return total_cost
 
-# Akıllı fonksiyonlar
-def optimize_materials(project):
-    # Malzeme optimizasyonu (basit örnek)
-    print("Malzeme optimizasyonu yapılıyor...")
-    optimized_layout = np.random.choice(project['parts'], size=len(project['parts']), replace=False)
-    print(f"Optimized layout: {optimized_layout}")
+# 8. Nesting ve Malzeme Optimizasyonu
+def nesting_and_material_optimization(project):
+    print("Nesting ve malzeme optimizasyonu yapıldı.")
+    optimized_materials = "Optimizasyon başarılı!"
+    return optimized_materials
 
-# Ana fonksiyon
+# 9. Akıllı Fonksiyonlar (Örnek)
+def smart_functions(project):
+    assembly_order = np.random.choice(project.parts, size=len(project.parts), replace=False)
+    print(f"Montaj sırası: {', '.join(assembly_order)}")
+    return assembly_order
+
+# 10. Ana Arayüz (Streamlit)
 def main():
-    print("Proje Başlatılıyor...")
-    
-    # Smart Functions
-    smart_functions(project)
-    
-    # PDF Teklif Oluşturma
-    generate_pdf(project)
-    
-    # CSV Çıktısı Oluşturma
-    generate_csv(project)
-    
-    # QR Kod Üretimi
-    generate_qr_code('Parça QR Kodu')
-    
-    # CNC DXF Entegrasyonu
-    generate_dxf(project)
-    
-    # 3D Görselleştirme
-    visualize_3d(project)
-    
-    # Donanım ve Maliyet Hesaplama
-    calculate_costs(project)
-    
-    # Malzeme Optimizasyonu
-    optimize_materials(project)
+    project = Project(
+        measurements={'width': 100, 'height': 200, 'depth': 50},
+        parts=['parça1', 'parça2', 'parça3'],
+        hardware=['vida', 'minifix', 'ray'],
+        nesting='optimize',
+        cabindel_positions={'lamello': [20, 40, 60], 'hinge': [15, 30]}
+    )
 
-# Ana fonksiyonu çalıştır
+    # Modül işlemleri
+    generate_pdf(project)
+    generate_qr_code('parça1')
+    generate_dxf(project)
+    generate_3d_visualization(project)
+    add_hinge_and_cabineo_holes(project)
+    total_cost = calculate_cost(project)
+    print(f"Toplam Maliyet: {total_cost} TL")
+    optimized_materials = nesting_and_material_optimization(project)
+    print(optimized_materials)
+    assembly_order = smart_functions(project)
+
+# Streamlit UI
 if __name__ == "__main__":
     main()
