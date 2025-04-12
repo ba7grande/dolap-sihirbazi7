@@ -1,94 +1,72 @@
-import streamlit as st
-import numpy as np
-from fpdf import FPDF
-import qrcode
-import pyautogui
-import plotly.graph_objects as go
-from pythreejs import *  # 3D render için
+import ezdxf
 
-# Proje veri yapısı
-class Project:
-    def __init__(self, width, height, depth):
-        self.width = width
-        self.height = height
-        self.depth = depth
-        self.parts = []
-        self.material_cost = 0
-        self.hardware_cost = 0
-        self.assembly_order = []
-        self.dxf_output = ""
+PLAKA_GENISLIK = 2440
+PLAKA_YUKSEKLIK = 1220
+ARA_BOSLUK = 10
+CABINEO_CAPI = 15
+CABINEO_MARGIN = 64
+CABINEO_SPACING = 128
 
-    def add_part(self, part):
-        self.parts.append(part)
+parcalar = [
+    (600, 400),  # Parça 1
+    (400, 400),  # Parça 2
+    (300, 600),  # Parça 3
+    (500, 300)   # Parça 4
+]
 
-    def set_material_cost(self, cost):
-        self.material_cost = cost
+def add_cabineo_holes(msp, x0, y0, gen, yuk):
+    # Sadece uzun kenarlara Cabineo deliği yerleştir (soldan sağa)
+    x_positions = list(range(CABINEO_MARGIN, int(gen - CABINEO_MARGIN) + 1, CABINEO_SPACING))
+    y_center = y0 + yuk / 2
 
-    def set_hardware_cost(self, cost):
-        self.hardware_cost = cost
+    for x in x_positions:
+        msp.add_circle(center=(x0 + x, y_center), radius=CABINEO_CAPI / 2, dxfattribs={'layer': 'cabineo'})
 
-# 3D görselleştirme
-def generate_3d_view(project):
-    # Burada, streamlit ile uyumlu olarak 3D görselleştirme kodu olacak
-    # Pythreejs veya başka bir kütüphane kullanılabilir
-    pass
+def nesting_with_cabineo(parcalar, plaka_genislik, plaka_yukseklik, bosluk, filename="nesting_cabineo.dxf"):
+    doc = ezdxf.new()
+    msp = doc.modelspace()
 
-# DXF çıktı üretimi
-def generate_dxf(project):
-    # Burada DXF dosyalarını üretmek için kod olacak
-    pass
+    # Plaka çizimi
+    msp.add_lwpolyline([
+        (0, 0),
+        (plaka_genislik, 0),
+        (plaka_genislik, plaka_yukseklik),
+        (0, plaka_yukseklik),
+        (0, 0)
+    ], dxfattribs={'layer': 'plaka'})
 
-# QR Kod üretimi
-def generate_qr_code(data):
-    qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_L,
-                       box_size=10, border=4)
-    qr.add_data(data)
-    qr.make(fit=True)
-    img = qr.make_image(fill='black', back_color='white')
-    return img
+    x = y = 0
+    max_satir_yukseklik = 0
 
-# PDF Teklif Raporu
-def generate_pdf(project):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", size=12)
-    
-    pdf.cell(200, 10, txt=f"Project Dimensions: {project.width} x {project.height} x {project.depth}", ln=True)
-    pdf.cell(200, 10, txt=f"Material Cost: {project.material_cost} USD", ln=True)
-    pdf.cell(200, 10, txt=f"Hardware Cost: {project.hardware_cost} USD", ln=True)
-    pdf.output("project_quote.pdf")
+    for idx, (gen, yuk) in enumerate(parcalar):
+        if x + gen > plaka_genislik:
+            x = 0
+            y += max_satir_yukseklik + bosluk
+            max_satir_yukseklik = 0
 
-# Ana UI
-def main_ui():
-    st.title("Fithole Benzeri Dolap Üretim Yazılımı")
+        if y + yuk > plaka_yukseklik:
+            print(f"Parça sığmadı: {idx+1}. parça ({gen}x{yuk})")
+            continue
 
-    # Proje oluşturma
-    st.sidebar.header("Proje Girişi")
-    width = st.sidebar.number_input("Dolap Genişliği (cm)", min_value=50, max_value=500, value=120)
-    height = st.sidebar.number_input("Dolap Yüksekliği (cm)", min_value=100, max_value=300, value=200)
-    depth = st.sidebar.number_input("Dolap Derinliği (cm)", min_value=30, max_value=100, value=60)
+        # Parça çerçevesi
+        msp.add_lwpolyline([
+            (x, y),
+            (x + gen, y),
+            (x + gen, y + yuk),
+            (x, y + yuk),
+            (x, y)
+        ], dxfattribs={'layer': 'parca'})
 
-    project = Project(width, height, depth)
+        # Parça etiketi
+        msp.add_text(f"P{idx+1}", dxfattribs={'height': 10}).set_pos((x + 5, y + 5))
 
-    if st.sidebar.button("Oluştur"):
-        st.sidebar.write(f"Proje: {width} x {height} x {depth} cm")
-        # 3D Görselleştirme
-        generate_3d_view(project)
+        # Cabineo delikleri
+        add_cabineo_holes(msp, x, y, gen, yuk)
 
-        # DXF çıktısı
-        generate_dxf(project)
+        x += gen + bosluk
+        max_satir_yukseklik = max(max_satir_yukseklik, yuk)
 
-        # QR Kod
-        qr_code_image = generate_qr_code(f"Project: {width}x{height}x{depth}")
-        st.image(qr_code_image, caption="QR Code for Project")
+    doc.saveas(filename)
+    print(f"DXF kaydedildi: {filename}")
 
-        # PDF Teklif Raporu
-        generate_pdf(project)
-        st.write("PDF raporu başarıyla oluşturuldu!")
-
-# Main fonksiyonu
-def main():
-    main_ui()
-
-if __name__ == "__main__":
-    main()
+nesting_with_cabineo(parcalar, PLAKA_GENISLIK, PLAKA_YUKSEKLIK, ARA_BOSLUK)
