@@ -88,4 +88,3 @@ if st.button("DXF Dosyasını Oluştur"):
     # Dosya indir butonu
     with open(filename, "rb") as file:
         st.download_button(label="DXF Dosyasını İndir", data=file, file_name=filename)
-
